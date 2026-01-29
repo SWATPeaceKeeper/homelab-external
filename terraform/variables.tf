@@ -46,7 +46,7 @@ variable "domain" {
 variable "subdomain_prefix" {
   description = "Subdomain-Prefix für Homelab-Dienste"
   type        = string
-  default     = "homelab" # → headscale.homelab.robinwerner.net
+  default     = "homelab-external" # → headscale.homelab.robinwerner.net
 }
 
 # -----------------------------------------------------------------------------
@@ -61,7 +61,7 @@ variable "server_name" {
 variable "server_type" {
   description = "Hetzner Server Typ"
   type        = string
-  default     = "cx22" # 2 vCPU, 4 GB RAM, 40 GB SSD - ca. 5 EUR/Monat
+  default     = "cpx22" # 2 vCPU, 4 GB RAM, 80 GB SSD - ca. 8 EUR/Monat
 }
 
 variable "server_location" {
