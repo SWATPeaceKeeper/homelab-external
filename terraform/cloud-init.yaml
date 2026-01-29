@@ -79,6 +79,7 @@ runcmd:
   - git clone ${repo_ssh_url} /opt/homelab-repo
 
   # --- Configs kopieren ---
+  - mkdir -p /opt/homelab
   - cp -r /opt/homelab-repo/hetzner/* /opt/homelab/
   - mkdir -p /opt/homelab/traefik/certs
   - mkdir -p /opt/homelab/headscale/data
