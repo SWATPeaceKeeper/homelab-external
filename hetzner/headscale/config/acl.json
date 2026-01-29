@@ -1,6 +1,4 @@
 {
-  "// Kommentar": "Homelab ACL Konfiguration - https://tailscale.com/kb/1018/acls",
-
   "groups": {
     "group:admin": ["robin"],
     "group:monitoring": ["hetzner-server"],
@@ -21,14 +19,11 @@
 
   "acls": [
     {
-      "// Kommentar": "Admins haben vollen Zugriff auf alles",
       "action": "accept",
       "src": ["group:admin"],
       "dst": ["*:*"]
     },
-
     {
-      "// Kommentar": "Monitoring-Server kann interne Dienste prüfen",
       "action": "accept",
       "src": ["group:monitoring"],
       "dst": [
@@ -45,24 +40,18 @@
         "homelab:9100"
       ]
     },
-
     {
-      "// Kommentar": "Alle Clients können Ping zu allen Nodes",
       "action": "accept",
       "src": ["*"],
       "dst": ["*:*"],
       "proto": "icmp"
     },
-
     {
-      "// Kommentar": "Alle können NUC per SSH erreichen",
       "action": "accept",
       "src": ["*"],
       "dst": ["nuc:22"]
     },
-
     {
-      "// Kommentar": "Familie kann Home Assistant nutzen",
       "action": "accept",
       "src": ["group:family"],
       "dst": [
@@ -75,7 +64,6 @@
 
   "ssh": [
     {
-      "// Kommentar": "Admins können SSH zu allen Nodes",
       "action": "accept",
       "src": ["group:admin"],
       "dst": ["*"],

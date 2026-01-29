@@ -26,7 +26,6 @@ entryPoints:
     http:
       tls:
         certResolver: letsencrypt
-    http3: {}  # HTTP/3 Unterstützung
 
   # Headscale internal (für direkte Verbindungen)
   headscale:
@@ -109,8 +108,3 @@ metrics:
 ping:
   entryPoint: web
 
-# -----------------------------------------------------------------------------
-# Experimental (HTTP/3)
-# -----------------------------------------------------------------------------
-experimental:
-  http3: true
