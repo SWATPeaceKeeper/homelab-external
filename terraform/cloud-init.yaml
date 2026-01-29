@@ -1,0 +1,145 @@
+#cloud-config
+# ============================================================================
+# Homelab External Server - Cloud-Init Configuration
+# ============================================================================
+# Dieses Script macht nur das Basis-Setup.
+# Die eigentlichen Configs kommen aus dem geklonten Git Repository.
+# ============================================================================
+
+# -----------------------------------------------------------------------------
+# System-Updates und Pakete
+# -----------------------------------------------------------------------------
+package_update: true
+package_upgrade: true
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - htop
+  - vim
+  - git
+  - jq
+  - unzip
+  - fail2ban
+  - ufw
+
+# -----------------------------------------------------------------------------
+# SSH Deploy Key für GitHub
+# -----------------------------------------------------------------------------
+write_files:
+  - path: /root/.ssh/deploy_key
+    permissions: '0600'
+    content: |
+      ${deploy_key_private}
+
+  - path: /root/.ssh/config
+    permissions: '0644'
+    content: |
+      Host github.com
+        HostName github.com
+        User git
+        IdentityFile /root/.ssh/deploy_key
+        StrictHostKeyChecking no
+
+# -----------------------------------------------------------------------------
+# Setup Commands
+# -----------------------------------------------------------------------------
+runcmd:
+  # --- Docker Installation ---
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # Docker Compose Alias
+  - ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+
+  # Docker starten
+  - systemctl enable docker
+  - systemctl start docker
+
+  # --- Firewall konfigurieren ---
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow ssh
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 3478/udp
+  - ufw allow 3478/tcp
+  - ufw --force enable
+
+  # --- Fail2ban starten ---
+  - systemctl enable fail2ban
+  - systemctl start fail2ban
+
+  # --- Repository klonen ---
+  - git clone ${repo_ssh_url} /opt/homelab-repo
+
+  # --- Configs kopieren ---
+  - cp -r /opt/homelab-repo/hetzner/* /opt/homelab/
+  - mkdir -p /opt/homelab/traefik/certs
+  - mkdir -p /opt/homelab/headscale/data
+  - mkdir -p /opt/homelab/uptime-kuma
+  - mkdir -p /opt/homelab/ntfy/{cache,data}
+  - mkdir -p /opt/homelab/healthchecks
+  - mkdir -p /opt/homelab/tailscale
+  - touch /opt/homelab/traefik/certs/acme.json
+  - chmod 600 /opt/homelab/traefik/certs/acme.json
+
+  # --- .env Datei erstellen ---
+  - |
+    cat > /opt/homelab/.env << 'ENVEOF'
+    # ==========================================================================
+    # Homelab External - Environment Variables
+    # ==========================================================================
+    # Diese Datei wurde automatisch erstellt.
+    # Secrets wurden von Terraform generiert.
+    # ==========================================================================
+
+    # Domain Konfiguration
+    DOMAIN=${domain}
+    SUBDOMAIN_PREFIX=${subdomain_prefix}
+
+    # Headscale API Key
+    # WICHTIG: Nach erstem Start generieren mit:
+    # docker exec headscale headscale apikeys create --expiration 365d
+    HEADSCALE_API_KEY=REPLACE_AFTER_FIRST_START
+
+    # Secrets (von Terraform generiert)
+    COOKIE_SECRET=${cookie_secret}
+    HEALTHCHECKS_SECRET=${healthchecks_secret}
+
+    # Timezone
+    TZ=Europe/Berlin
+    ENVEOF
+
+  # --- Docker Compose starten ---
+  - cd /opt/homelab && docker compose up -d
+
+  # --- Erfolg loggen ---
+  - echo "Cloud-init completed successfully at $(date)" >> /var/log/cloud-init-complete.log
+  - echo "Next steps:" >> /var/log/cloud-init-complete.log
+  - echo "1. SSH to server" >> /var/log/cloud-init-complete.log
+  - echo "2. docker exec headscale headscale namespaces create homelab" >> /var/log/cloud-init-complete.log
+  - echo "3. docker exec headscale headscale apikeys create --expiration 365d" >> /var/log/cloud-init-complete.log
+  - echo "4. Add API key to /opt/homelab/.env" >> /var/log/cloud-init-complete.log
+  - echo "5. docker compose restart" >> /var/log/cloud-init-complete.log
+
+# -----------------------------------------------------------------------------
+# System Konfiguration
+# -----------------------------------------------------------------------------
+timezone: Europe/Berlin
+locale: de_DE.UTF-8
+
+# SSH Hardening
+ssh_pwauth: false
+disable_root: false
+
+# Swap erstellen (für Low-Memory Situationen)
+swap:
+  filename: /swapfile
+  size: 2G
+  maxsize: 2G

@@ -1,0 +1,47 @@
+# ============================================================================
+# Terraform .gitignore
+# ============================================================================
+
+# Terraform State (enthält sensitive Daten!)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Crash Logs
+crash.log
+crash.*.log
+
+# Sensitive Variablen (NIEMALS committen!)
+terraform.tfvars
+*.auto.tfvars
+secrets.tf
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# Backup files
+*.backup
+*.bak
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Lokale Notizen
+notes.md
+TODO.md

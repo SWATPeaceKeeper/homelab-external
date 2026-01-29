@@ -1,0 +1,130 @@
+# ============================================================================
+# Headscale Configuration
+# ============================================================================
+# Pfad auf Server: /opt/homelab/headscale/config/config.yaml
+# Dokumentation: https://headscale.net/stable/ref/configuration/
+# ============================================================================
+
+# Server URL - MUSS angepasst werden!
+server_url: https://headscale.homelab.robinwerner.net
+
+# Listen Adressen
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 0.0.0.0:9090
+grpc_listen_addr: 0.0.0.0:50443
+grpc_allow_insecure: false
+
+# -----------------------------------------------------------------------------
+# Noise Protocol Keys
+# -----------------------------------------------------------------------------
+private_key_path: /var/lib/headscale/private.key
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+# -----------------------------------------------------------------------------
+# IP Prefixes für Clients
+# -----------------------------------------------------------------------------
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential  # oder 'random'
+
+# -----------------------------------------------------------------------------
+# DERP (Relay Server)
+# -----------------------------------------------------------------------------
+derp:
+  server:
+    enabled: true
+    region_id: 999
+    region_code: "homelab"
+    region_name: "Homelab DERP"
+    stun_listen_addr: "0.0.0.0:3478"
+    # Automatisch privaten DERP verwenden wenn Tailscale erreichbar
+    automatically_add_embedded_derp_region: true
+    ipv4: "WIRD_AUTOMATISCH_ERMITTELT"
+    ipv6: ""
+
+  # Zusätzliche öffentliche DERP Server als Fallback
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+
+  auto_update_enabled: true
+  update_frequency: 24h
+
+# -----------------------------------------------------------------------------
+# Database
+# -----------------------------------------------------------------------------
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+
+# Für Production mit PostgreSQL (optional):
+# database:
+#   type: postgres
+#   postgres:
+#     host: postgres
+#     port: 5432
+#     name: headscale
+#     user: headscale
+#     pass: PASSWORT
+#     ssl: disable
+
+# -----------------------------------------------------------------------------
+# DNS Konfiguration
+# -----------------------------------------------------------------------------
+dns:
+  magic_dns: true
+  base_domain: tailnet
+
+  nameservers:
+    global:
+      - 10.0.0.53    # PiHole (via Subnet Router)
+      - 1.1.1.1       # Fallback
+      - 8.8.8.8
+
+    # Split DNS für interne Domains
+    split: {}
+    # Beispiel:
+    # split:
+    #   homelab.local:
+    #     - 10.0.0.53
+
+  # Extra DNS Records
+  extra_records: []
+  # Beispiel:
+  # extra_records:
+  #   - name: "nas.tailnet"
+  #     type: "A"
+  #     value: "10.0.0.30"
+
+# -----------------------------------------------------------------------------
+# Node Einstellungen
+# -----------------------------------------------------------------------------
+disable_check_updates: false
+ephemeral_node_inactivity_timeout: 30m
+
+# Automatische Registrierung (nur für vertrauenswürdige Netze!)
+# oidc: ...
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+log:
+  format: text  # oder 'json'
+  level: info   # debug, info, warn, error
+
+# -----------------------------------------------------------------------------
+# Policy / ACLs
+# -----------------------------------------------------------------------------
+policy:
+  mode: file
+  path: /etc/headscale/acl.json
+
+# -----------------------------------------------------------------------------
+# Tuning (optional)
+# -----------------------------------------------------------------------------
+# Für größere Deployments:
+# tuning:
+#   batch_change_delay: 800ms
+#   node_mapsession_buffered_chan_size: 30

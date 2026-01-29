@@ -1,0 +1,97 @@
+{
+  "// Kommentar": "Homelab ACL Konfiguration - https://tailscale.com/kb/1018/acls",
+
+  "groups": {
+    "group:admin": ["robin"],
+    "group:monitoring": ["hetzner-server"],
+    "group:family": []
+  },
+
+  "tagOwners": {
+    "tag:server": ["group:admin"],
+    "tag:monitoring": ["group:admin"],
+    "tag:client": ["group:admin"]
+  },
+
+  "hosts": {
+    "homelab": "10.0.0.0/24",
+    "nuc": "100.64.0.2",
+    "hetzner": "100.64.0.1"
+  },
+
+  "acls": [
+    {
+      "// Kommentar": "Admins haben vollen Zugriff auf alles",
+      "action": "accept",
+      "src": ["group:admin"],
+      "dst": ["*:*"]
+    },
+
+    {
+      "// Kommentar": "Monitoring-Server kann interne Dienste prüfen",
+      "action": "accept",
+      "src": ["group:monitoring"],
+      "dst": [
+        "homelab:22",
+        "homelab:80",
+        "homelab:443",
+        "homelab:3000",
+        "homelab:3100",
+        "homelab:8080",
+        "homelab:8123",
+        "homelab:8428",
+        "homelab:9090",
+        "homelab:9093",
+        "homelab:9100"
+      ]
+    },
+
+    {
+      "// Kommentar": "Alle Clients können Ping zu allen Nodes",
+      "action": "accept",
+      "src": ["*"],
+      "dst": ["*:*"],
+      "proto": "icmp"
+    },
+
+    {
+      "// Kommentar": "Alle können NUC per SSH erreichen",
+      "action": "accept",
+      "src": ["*"],
+      "dst": ["nuc:22"]
+    },
+
+    {
+      "// Kommentar": "Familie kann Home Assistant nutzen",
+      "action": "accept",
+      "src": ["group:family"],
+      "dst": [
+        "homelab:8123",
+        "homelab:80",
+        "homelab:443"
+      ]
+    }
+  ],
+
+  "ssh": [
+    {
+      "// Kommentar": "Admins können SSH zu allen Nodes",
+      "action": "accept",
+      "src": ["group:admin"],
+      "dst": ["*"],
+      "users": ["autogroup:nonroot", "root"]
+    }
+  ],
+
+  "tests": [
+    {
+      "src": "robin",
+      "accept": ["nuc:22", "homelab:8123", "hetzner:443"]
+    },
+    {
+      "src": "hetzner-server",
+      "accept": ["homelab:3000", "homelab:9090"],
+      "deny": ["homelab:5432"]
+    }
+  ]
+}
