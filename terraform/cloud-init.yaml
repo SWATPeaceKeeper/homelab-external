@@ -32,8 +32,8 @@ packages:
 write_files:
   - path: /root/.ssh/deploy_key
     permissions: '0600'
-    content: |
-${deploy_key_private}
+    encoding: b64
+    content: ${deploy_key_private_b64}
 
   - path: /root/.ssh/config
     permissions: '0644'
