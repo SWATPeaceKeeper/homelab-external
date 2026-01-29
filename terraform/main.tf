@@ -90,8 +90,8 @@ resource "hcloud_firewall" "homelab" {
 # -----------------------------------------------------------------------------
 locals {
   cloud_init = templatefile("${path.module}/cloud-init.yaml", {
-    # GitHub Deploy Key
-    deploy_key_private = tls_private_key.deploy_key.private_key_openssh
+    # GitHub Deploy Key - mit indent() für korrekte YAML-Formatierung
+    deploy_key_private = indent(6, tls_private_key.deploy_key.private_key_openssh)
     repo_ssh_url       = var.repo_ssh_url
 
     # Domain

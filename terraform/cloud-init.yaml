@@ -33,7 +33,7 @@ write_files:
   - path: /root/.ssh/deploy_key
     permissions: '0600'
     content: |
-      ${deploy_key_private}
+${deploy_key_private}
 
   - path: /root/.ssh/config
     permissions: '0644'
