@@ -175,8 +175,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Server Info" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          terraform output -no-color server_ipv4 >> $GITHUB_STEP_SUMMARY
-          terraform output -no-color ssh_command >> $GITHUB_STEP_SUMMARY
+          echo "IPv4: $(terraform output -raw server_ipv4)" >> $GITHUB_STEP_SUMMARY
+          echo "SSH:  $(terraform output -raw ssh_command)" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### URLs" >> $GITHUB_STEP_SUMMARY
@@ -186,12 +186,14 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ⚠️ Deploy Key für GitHub" >> $GITHUB_STEP_SUMMARY
           echo "Füge diesen Key als Deploy Key zum Repository hinzu:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          terraform output -no-color github_deploy_key >> $GITHUB_STEP_SUMMARY
+          terraform output -raw github_deploy_key >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Nächste Schritte" >> $GITHUB_STEP_SUMMARY
-          terraform output -no-color -raw next_steps >> $GITHUB_STEP_SUMMARY
+          terraform output -raw next_steps >> $GITHUB_STEP_SUMMARY
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}

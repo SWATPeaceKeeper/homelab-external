@@ -27,7 +27,7 @@ output "ssh_command" {
 # -----------------------------------------------------------------------------
 output "github_deploy_key" {
   description = "Public Key für GitHub Deploy Key (diesen bei GitHub hinzufügen!)"
-  value       = tls_private_key.deploy_key.public_key_openssh
+  value       = trimspace(tls_private_key.deploy_key.public_key_openssh)
 }
 
 # -----------------------------------------------------------------------------
