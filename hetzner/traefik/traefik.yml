@@ -27,10 +27,6 @@ entryPoints:
       tls:
         certResolver: letsencrypt
 
-  # Headscale internal (für direkte Verbindungen)
-  headscale:
-    address: ":8080"
-
 # -----------------------------------------------------------------------------
 # Providers
 # -----------------------------------------------------------------------------

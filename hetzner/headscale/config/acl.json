@@ -1,7 +1,7 @@
 {
   "groups": {
-    "group:admin": ["robin"],
-    "group:monitoring": ["hetzner-server"],
+    "group:admin": ["robin@homelab"],
+    "group:monitoring": ["hetzner-server@homelab"],
     "group:family": []
   },
 
@@ -12,7 +12,7 @@
   },
 
   "hosts": {
-    "homelab": "10.0.0.0/24",
+    "homelab-network": "10.0.0.0/24",
     "nuc": "100.64.0.2",
     "hetzner": "100.64.0.1"
   },
@@ -27,17 +27,17 @@
       "action": "accept",
       "src": ["group:monitoring"],
       "dst": [
-        "homelab:22",
-        "homelab:80",
-        "homelab:443",
-        "homelab:3000",
-        "homelab:3100",
-        "homelab:8080",
-        "homelab:8123",
-        "homelab:8428",
-        "homelab:9090",
-        "homelab:9093",
-        "homelab:9100"
+        "homelab-network:22",
+        "homelab-network:80",
+        "homelab-network:443",
+        "homelab-network:3000",
+        "homelab-network:3100",
+        "homelab-network:8080",
+        "homelab-network:8123",
+        "homelab-network:8428",
+        "homelab-network:9090",
+        "homelab-network:9093",
+        "homelab-network:9100"
       ]
     },
     {
@@ -55,9 +55,9 @@
       "action": "accept",
       "src": ["group:family"],
       "dst": [
-        "homelab:8123",
-        "homelab:80",
-        "homelab:443"
+        "homelab-network:8123",
+        "homelab-network:80",
+        "homelab-network:443"
       ]
     }
   ],
@@ -73,13 +73,13 @@
 
   "tests": [
     {
-      "src": "robin",
-      "accept": ["nuc:22", "homelab:8123", "hetzner:443"]
+      "src": "robin@homelab",
+      "accept": ["nuc:22", "homelab-network:8123", "hetzner:443"]
     },
     {
-      "src": "hetzner-server",
-      "accept": ["homelab:3000", "homelab:9090"],
-      "deny": ["homelab:5432"]
+      "src": "hetzner-server@homelab",
+      "accept": ["homelab-network:3000", "homelab-network:9090"],
+      "deny": ["homelab-network:5432"]
     }
   ]
 }
