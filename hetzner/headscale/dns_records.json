@@ -1,0 +1,11 @@
+[
+  // Extra DNS Records für das VPN
+  // Dokumentation: https://headscale.net/stable/ref/dns/
+  //
+  // Beispiel:
+  // {
+  //   "name": "nas.tailnet",
+  //   "type": "A",
+  //   "value": "100.64.0.10"
+  // }
+]

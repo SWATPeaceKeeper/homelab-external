@@ -18,7 +18,7 @@
 headscale:
   url: http://headscale:8080
   config_path: /etc/headscale/config.yaml
-  config_strict: false
+  config_strict: true
 
 # -----------------------------------------------------------------------------
 # SERVER EINSTELLUNGEN
@@ -41,20 +41,16 @@ server:
   cookie_secure: false
 
 # -----------------------------------------------------------------------------
-# INTEGRATION (optional)
+# INTEGRATION
 # -----------------------------------------------------------------------------
 # Docker Integration erlaubt Headplane, Headscale automatisch neu zu starten
-# wenn Config-Änderungen gemacht werden.
+# wenn Config-Änderungen (ACLs, DNS Records, etc.) gemacht werden.
 #
 # Erfordert: Docker Socket Mount in docker-compose.yml
-#   - /var/run/docker.sock:/var/run/docker.sock
-#
-# Da wir den Docker Socket NICHT mounten (Sicherheit),
-# musst du Headscale manuell neu starten nach ACL-Änderungen:
-#   docker compose restart headscale
+#   - /var/run/docker.sock:/var/run/docker.sock:ro
 # -----------------------------------------------------------------------------
-# integration:
-#   docker:
-#     enabled: true
-#     socket: /var/run/docker.sock
-#     container: headscale
+integration:
+  docker:
+    enabled: true
+    socket: /var/run/docker.sock
+    container: headscale

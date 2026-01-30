@@ -51,8 +51,6 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      # Dashboard (optional - für Debugging)
-      # ACHTUNG: Ändere das Passwort! Generieren mit: htpasswd -nb admin DEINPASSWORT
       - "traefik.http.routers.dashboard.rule=Host(`traefik.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
       - "traefik.http.routers.dashboard.tls=true"
       - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
@@ -66,16 +64,16 @@ services:
   # PostgreSQL ist die empfohlene Datenbank für Headscale in Produktion.
   # Robuster als SQLite, besonders bei vielen Nodes.
   # =========================================================================
-  postgres:
-    image: postgres:16-alpine
-    container_name: postgres
+  headscale-postgres:
+    image: postgres:18-alpine
+    container_name: headscale-postgres
     restart: unless-stopped
     environment:
       - POSTGRES_USER=headscale
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=headscale
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/headscale-postgres:/var/lib/postgresql
     networks:
       - internal
     healthcheck:
@@ -97,30 +95,47 @@ services:
   # docker exec headscale headscale users create homelab
   # =========================================================================
   headscale:
-    image: headscale/headscale:latest
+    image: ghcr.io/juanfont/headscale:stable
     container_name: headscale
     restart: unless-stopped
     command: serve
     depends_on:
-      postgres:
+      headscale-postgres:
         condition: service_healthy
     volumes:
-      # Konfiguration (aus Git)
-      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
-      - ./headscale/acl.json:/etc/headscale/acl.json:ro
-      # Daten (Keys, etc. - Datenbank ist jetzt in PostgreSQL)
+      - ./headscale/config.yaml:/etc/headscale/config.yaml
+      - ./headscale/acl.json:/etc/headscale/acl.json
+      - ./headscale/dns_records.json:/etc/headscale/dns_records.json
       - ./data/headscale:/var/lib/headscale
     networks:
       - proxy
       - internal
+    healthcheck:
+        test: ["CMD", "headscale", "health"]
     labels:
+      # Traefik labels to expose Headscale at headscale.example.com
       - "traefik.enable=true"
-      # Haupt-Router für API und Web
       - "traefik.http.routers.headscale.rule=Host(`headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
       - "traefik.http.routers.headscale.tls=true"
       - "traefik.http.routers.headscale.tls.certresolver=letsencrypt"
       - "traefik.http.routers.headscale.entrypoints=websecure"
+      # This middleware is essential to ensuring Headplane works correctly
+      - 'traefik.http.routers.headscale.middlewares=cors'
+      - 'traefik.http.middlewares.cors.headers.accesscontrolallowheaders=*'
+      - 'traefik.http.middlewares.cors.headers.accesscontrolallowmethods=GET,POST,PUT'
+      - 'traefik.http.middlewares.cors.headers.accesscontrolalloworiginlist=https://headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}'
+      - 'traefik.http.middlewares.cors.headers.accesscontrolmaxage=100'
+      - 'traefik.http.middlewares.cors.headers.addvaryheader=true'
+      # Headscale Service Port
       - "traefik.http.services.headscale.loadbalancer.server.port=8080"
+      # Redirect / to /admin (Headplane UI)
+      - 'traefik.http.routers.rewrite.rule=Host(`headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}`) && Path(`/`)'
+      - 'traefik.http.routers.rewrite.entrypoints=websecure'
+      - 'traefik.http.routers.rewrite.tls=true'
+      - 'traefik.http.routers.rewrite.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.rewrite.middlewares=rewrite'
+      - 'traefik.http.middlewares.rewrite.redirectregex.regex=^https://headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}/?$$'
+      - 'traefik.http.middlewares.rewrite.redirectregex.replacement=https://headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}/admin'
 
   # =========================================================================
   # HEADPLANE - VPN Web UI
@@ -137,20 +152,26 @@ services:
     container_name: headplane
     restart: unless-stopped
     volumes:
-      # Konfiguration
-      - ./headplane/config.yaml:/etc/headplane/config.yaml:ro
-      # Headscale Config (für Integration)
-      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
-      # Daten
+      - ./headplane/config.yaml:/etc/headplane/config.yaml
       - ./data/headplane:/var/lib/headplane
+      - ./headscale/config.yaml:/etc/headscale/config.yaml
+      - ./headscale/dns_records.json:/etc/headscale/dns_records.json
+      - ./headscale/acl.json:/etc/headscale/acl.json
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - headscale
+    healthcheck:
+      test: ["/bin/hp_healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
     networks:
       - proxy
       - internal
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.headplane.rule=Host(`vpn.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
+      - "traefik.http.routers.headplane.rule=Host(`headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}`) && PathPrefix(`/admin`)"
       - "traefik.http.routers.headplane.tls=true"
       - "traefik.http.routers.headplane.tls.certresolver=letsencrypt"
       - "traefik.http.services.headplane.loadbalancer.server.port=3000"
@@ -169,7 +190,7 @@ services:
   # 3. Container neu starten
   # =========================================================================
   tailscale:
-    image: tailscale/tailscale:latest
+    image: ghcr.io/tailscale/tailscale:stable
     container_name: tailscale
     hostname: hetzner-server
     restart: unless-stopped
@@ -193,7 +214,7 @@ services:
   # Kann Benachrichtigungen senden wenn etwas down ist.
   # =========================================================================
   uptime-kuma:
-    image: louislam/uptime-kuma:latest
+    image: louislam/uptime-kuma:2
     container_name: uptime-kuma
     restart: unless-stopped
     volumes:
@@ -227,14 +248,22 @@ services:
       - NTFY_BASE_URL=https://ntfy.${SUBDOMAIN_PREFIX}.${DOMAIN}
       - NTFY_UPSTREAM_BASE_URL=https://ntfy.sh
       - NTFY_AUTH_DEFAULT_ACCESS=deny-all
-      - NTFY_AUTH_FILE=/var/lib/ntfy/user.db
+      - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
+      - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
+      - NTFY_ATTACHMENT_CACHE_DIR=/var/lib/ntfy/attachments
       - NTFY_BEHIND_PROXY=true
-      - NTFY_ENABLE_SIGNUP=false
+      - NTFY_ENABLE_LOGIN=true
     volumes:
       - ./data/ntfy/cache:/var/cache/ntfy
       - ./data/ntfy/data:/var/lib/ntfy
     networks:
       - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --tries=1 http://localhost:80/v1/health -O - | grep -Eo '\"healthy\"\\s*:\\s*true' || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ntfy.rule=Host(`ntfy.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
@@ -255,10 +284,14 @@ services:
     environment:
       - ALLOWED_HOSTS=hc.${SUBDOMAIN_PREFIX}.${DOMAIN}
       - APPRISE_ENABLED=True
-      - DB=sqlite
-      - DB_NAME=/data/hc.sqlite
-      - DEBUG=False
-      - DEFAULT_FROM_EMAIL=noreply@${DOMAIN}
+      - DB=postgres
+      - DB_HOST=healthchecks-postgres
+      - DB_NAME=healthchecks
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN}
+      - EMAIL_HOST=smtp.eu.mailgun.org
+      - EMAIL_HOST_PASSWORD=${HEALTHCHECKS_SMTP_PASSWORD}
+      - EMAIL_HOST_USER=healthchecks@mailgun.robinwerner.net
       - PING_BODY_LIMIT=100000
       - PING_EMAIL_DOMAIN=hc.${SUBDOMAIN_PREFIX}.${DOMAIN}
       - REGISTRATION_OPEN=False
@@ -269,12 +302,33 @@ services:
       - ./data/healthchecks:/data
     networks:
       - proxy
+    depends_on:
+      healthchecks-postgres:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.healthchecks.rule=Host(`hc.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
       - "traefik.http.routers.healthchecks.tls=true"
       - "traefik.http.routers.healthchecks.tls.certresolver=letsencrypt"
       - "traefik.http.services.healthchecks.loadbalancer.server.port=8000"
+
+  healthchecks-postgres:
+    image: postgres:18-alpine
+    container_name: healthchecks-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=healthchecks
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=healthchecks
+    volumes:
+      - ./data/healthchecks-postgres:/var/lib/postgresql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthchecks"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 # =============================================================================
 # NETZWERKE

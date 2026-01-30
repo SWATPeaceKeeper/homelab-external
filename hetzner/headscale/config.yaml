@@ -100,7 +100,7 @@ derp:
 database:
   type: postgres
   postgres:
-    host: postgres
+    host: headscale-postgres
     port: 5432
     name: headscale
     user: headscale
@@ -138,7 +138,7 @@ dns:
       # Sekundär: Google
       - 8.8.8.8
       # Optional: Eigener DNS (z.B. PiHole) über VPN
-      # - 100.64.0.X  # IP deines PiHole im VPN
+      - 10.10.10.3  # IP deines PiHole im VPN
 
   # Split DNS: Bestimmte Domains an bestimmte DNS Server
   split: {}
@@ -168,7 +168,7 @@ ephemeral_node_inactivity_timeout: 30m
 # LOGGING
 # -----------------------------------------------------------------------------
 log:
-  format: text    # oder 'json' für strukturierte Logs
+  format: json    # oder 'json' für strukturierte Logs
   level: info     # debug, info, warn, error
 
 # -----------------------------------------------------------------------------

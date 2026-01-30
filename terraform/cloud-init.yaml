@@ -140,12 +140,13 @@ runcmd:
   - mkdir -p /opt/homelab-repo
   - mkdir -p /opt/homelab-data/traefik/certs
   - mkdir -p /opt/homelab-data/headscale
+  - mkdir -p /opt/homelab-data/headscale-postgres
   - mkdir -p /opt/homelab-data/headplane
-  - mkdir -p /opt/homelab-data/postgres
   - mkdir -p /opt/homelab-data/uptime-kuma
   - mkdir -p /opt/homelab-data/ntfy/cache
   - mkdir -p /opt/homelab-data/ntfy/data
   - mkdir -p /opt/homelab-data/healthchecks
+  - mkdir -p /opt/homelab-data/healthchecks-postgres
   - mkdir -p /opt/homelab-data/tailscale
 
   # acme.json für Let's Encrypt Zertifikate (MUSS 600 sein!)
