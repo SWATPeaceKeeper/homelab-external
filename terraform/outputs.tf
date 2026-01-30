@@ -96,23 +96,17 @@ output "next_steps" {
        tail -f /var/log/cloud-init-output.log
        # Warten bis "Cloud-Init abgeschlossen" erscheint
 
-    4. REPOSITORY KLONEN UND SYMLINKS ERSTELLEN:
+    4. REPOSITORY KLONEN:
        git clone <REPO_SSH_URL> /opt/homelab-repo
-       ln -s /opt/homelab-repo/hetzner /opt/homelab
-       ln -s /opt/homelab-data /opt/homelab/data
 
     5. .ENV DATEI ERSTELLEN:
-       cd /opt/homelab
+       cd /opt/homelab-repo/hetzner
        cp .env.example .env
        nano .env
        # Secrets mit: terraform output -json generated_secrets
 
-    6. CONFIGS ANPASSEN:
-       # PostgreSQL Passwort in headscale/config.yaml eintragen
-       # Cookie Secret in headplane/config.yaml eintragen
-
-    7. DOCKER COMPOSE STARTEN:
-       cd /opt/homelab && docker compose up -d
+    6. DOCKER COMPOSE STARTEN:
+       cd /opt/homelab-repo/hetzner && docker compose up -d
 
     8. HEADSCALE KONFIGURIEREN:
        docker exec headscale headscale users create homelab

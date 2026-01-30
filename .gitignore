@@ -52,6 +52,3 @@ TODO.md
 
 # Environment-Datei (enthält Secrets!)
 hetzner/.env
-
-# Daten-Verzeichnis (Container-Volumes)
-hetzner/data/

@@ -130,10 +130,10 @@ runcmd:
   # =========================================================================
   # 4.4 ORDNERSTRUKTUR
   # =========================================================================
-  # /opt/homelab-repo/                    -> Git Repository (komplettes Repo)
-  # /opt/homelab -> /opt/homelab-repo/hetzner  -> Symlink (Arbeitsverzeichnis)
-  # /opt/homelab-data/                    -> Persistente Daten (AUSSERHALB Git!)
-  # /opt/homelab/data -> /opt/homelab-data     -> Symlink (docker-compose nutzt ./data/)
+  # /opt/homelab-repo/     -> Git Repository (komplettes Repo)
+  # /opt/homelab-data/     -> Persistente Daten (NICHT in Git!)
+  #
+  # KEINE Symlinks - docker-compose nutzt absolute Pfade!
   # =========================================================================
 
   # Verzeichnisse erstellen

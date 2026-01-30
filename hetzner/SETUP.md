@@ -134,50 +134,46 @@ htpasswd -nb admin DEIN_SICHERES_PASSWORT
 ssh root@<server-ip>
 ```
 
-### 4.2 Repository klonen und Symlinks erstellen
+### 4.2 Repository klonen
 
 ```bash
 # Deploy Key wurde von Cloud-Init bereits eingerichtet
-# Repository klonen
 git clone git@github.com:dein-user/homelab-external.git /opt/homelab-repo
 
-# Symlink für Arbeitsverzeichnis erstellen
-ln -s /opt/homelab-repo/hetzner /opt/homelab
-
-# Symlink für Daten erstellen (docker-compose nutzt ./data/)
-ln -s /opt/homelab-data /opt/homelab/data
-
 # Ins Arbeitsverzeichnis wechseln
-cd /opt/homelab
+cd /opt/homelab-repo/hetzner
 ```
 
 ### 4.3 Verzeichnisstruktur prüfen
 
 ```bash
-ls -la /opt/homelab/
-# Sollte zeigen: traefik/, headscale/, headplane/, data -> /opt/homelab-data
+ls -la /opt/homelab-repo/hetzner/
+# Sollte zeigen: docker-compose.yml, traefik/, headscale/, headplane/
 
 ls -la /opt/homelab-data/
-# Sollte zeigen: traefik/, headscale/, postgres/, uptime-kuma/, etc.
+# Sollte zeigen: traefik/, headscale/, secrets/, uptime-kuma/, etc.
 ```
 
 **Struktur auf dem Server:**
 ```
-/opt/homelab-repo/                    # Git Repository (komplett)
+/opt/homelab-repo/                    # Git Repository
 ├── .github/
 ├── terraform/
-└── hetzner/                          # ← Configs
-
-/opt/homelab -> /opt/homelab-repo/hetzner    # Symlink (Arbeitsverzeichnis)
+└── hetzner/                          # ← Arbeitsverzeichnis
+    ├── docker-compose.yml
+    ├── .env                          # Nicht in Git
+    ├── traefik/
+    ├── headscale/
+    └── headplane/
 
 /opt/homelab-data/                    # Persistente Daten (NICHT in Git!)
 ├── traefik/certs/
 ├── headscale/
-├── postgres/
+├── secrets/cookie_secret
 └── ...
-
-/opt/homelab/data -> /opt/homelab-data       # Symlink (für docker-compose)
 ```
+
+**Keine Symlinks!** docker-compose.yml nutzt absolute Pfade zu `/opt/homelab-data/`.
 
 ### 4.4 .env Datei erstellen
 
@@ -520,8 +516,6 @@ docker compose restart headscale  # z.B. nach ACL-Änderungen
 - [ ] Terraform erfolgreich ausgeführt
 - [ ] Deploy Key zu GitHub hinzugefügt
 - [ ] Repository geklont nach /opt/homelab-repo
-- [ ] Symlink /opt/homelab erstellt
-- [ ] Symlink /opt/homelab/data erstellt
 - [ ] Secrets generiert (POSTGRES_PASSWORD, HEALTHCHECKS_SECRET, TRAEFIK_DASHBOARD_AUTH)
 - [ ] .env Datei erstellt und ausgefüllt
 - [ ] Cookie Secret vorhanden (/opt/homelab-data/secrets/cookie_secret)

@@ -6,7 +6,7 @@
 #
 # VOLUME-STRUKTUR:
 # - Configs:  ./traefik/, ./headscale/, ./headplane/ (aus Git Repository)
-# - Daten:    ./data/ (persistente Daten, für Backups)
+# - Daten:    /opt/homelab-data/ (persistente Daten, für Backups)
 #
 # NETZWERKE:
 # - proxy:    Für Services die von außen erreichbar sein sollen
@@ -44,7 +44,7 @@ services:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/config:/etc/traefik/config:ro
       # SSL Zertifikate (DATEN - wird von Traefik geschrieben)
-      - ./data/traefik/certs:/etc/traefik/certs
+      - /opt/homelab-data/traefik/certs:/etc/traefik/certs
       # Access Logs
       - /var/log/traefik:/var/log/traefik
     networks:
@@ -73,7 +73,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=headscale
     volumes:
-      - ./data/headscale-postgres:/var/lib/postgresql
+      - /opt/homelab-data/headscale-postgres:/var/lib/postgresql
     networks:
       - internal
     healthcheck:
@@ -110,7 +110,7 @@ services:
       - ./headscale/config.yaml:/etc/headscale/config.yaml
       - ./headscale/acl.json:/etc/headscale/acl.json
       - ./headscale/dns_records.json:/etc/headscale/dns_records.json
-      - ./data/headscale:/var/lib/headscale
+      - /opt/homelab-data/headscale:/var/lib/headscale
     networks:
       - proxy
       - internal
@@ -157,13 +157,13 @@ services:
     restart: unless-stopped
     volumes:
       - ./headplane/config.yaml:/etc/headplane/config.yaml
-      - ./data/headplane:/var/lib/headplane
+      - /opt/homelab-data/headplane:/var/lib/headplane
       - ./headscale/config.yaml:/etc/headscale/config.yaml
       - ./headscale/dns_records.json:/etc/headscale/dns_records.json
       - ./headscale/acl.json:/etc/headscale/acl.json
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Cookie Secret aus Datei (nicht in Git)
-      - ./data/secrets/cookie_secret:/run/secrets/cookie_secret:ro
+      - /opt/homelab-data/secrets/cookie_secret:/run/secrets/cookie_secret:ro
     depends_on:
       - headscale
     healthcheck:
@@ -204,7 +204,7 @@ services:
       - NET_ADMIN
       - SYS_MODULE
     volumes:
-      - ./data/tailscale:/var/lib/tailscale
+      - /opt/homelab-data/tailscale:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
@@ -224,7 +224,7 @@ services:
     container_name: uptime-kuma
     restart: unless-stopped
     volumes:
-      - ./data/uptime-kuma:/app/data
+      - /opt/homelab-data/uptime-kuma:/app/data
     networks:
       - proxy
     labels:
@@ -260,8 +260,8 @@ services:
       - NTFY_BEHIND_PROXY=true
       - NTFY_ENABLE_LOGIN=true
     volumes:
-      - ./data/ntfy/cache:/var/cache/ntfy
-      - ./data/ntfy/data:/var/lib/ntfy
+      - /opt/homelab-data/ntfy/cache:/var/cache/ntfy
+      - /opt/homelab-data/ntfy/data:/var/lib/ntfy
     networks:
       - proxy
     healthcheck:
@@ -305,7 +305,7 @@ services:
       - SITE_NAME=Homelab Healthchecks
       - SITE_ROOT=https://hc.${SUBDOMAIN_PREFIX}.${DOMAIN}
     volumes:
-      - ./data/healthchecks:/data
+      - /opt/homelab-data/healthchecks:/data
     networks:
       - proxy
     depends_on:
@@ -327,7 +327,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=healthchecks
     volumes:
-      - ./data/healthchecks-postgres:/var/lib/postgresql
+      - /opt/homelab-data/healthchecks-postgres:/var/lib/postgresql
     networks:
       - internal
     healthcheck:
