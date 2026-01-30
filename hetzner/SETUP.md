@@ -132,27 +132,51 @@ htpasswd -nb admin DEIN_SICHERES_PASSWORT
 
 ```bash
 ssh root@<server-ip>
-cd /opt/homelab
 ```
 
-### 4.2 Repository klonen
+### 4.2 Repository klonen und Symlinks erstellen
 
 ```bash
 # Deploy Key wurde von Cloud-Init bereits eingerichtet
-git clone git@github.com:dein-user/homelab-external.git .
+# Repository klonen
+git clone git@github.com:dein-user/homelab-external.git /opt/homelab-repo
 
-# Oder falls schon geklont:
-git pull
+# Symlink für Arbeitsverzeichnis erstellen
+ln -s /opt/homelab-repo/hetzner /opt/homelab
+
+# Symlink für Daten erstellen (docker-compose nutzt ./data/)
+ln -s /opt/homelab-data /opt/homelab/data
+
+# Ins Arbeitsverzeichnis wechseln
+cd /opt/homelab
 ```
 
-### 4.3 Config-Dateien kopieren
+### 4.3 Verzeichnisstruktur prüfen
 
 ```bash
-# Verzeichnisstruktur prüfen
-ls -la
-# Sollte zeigen: traefik/, headscale/, headplane/, data/
+ls -la /opt/homelab/
+# Sollte zeigen: traefik/, headscale/, headplane/, data -> /opt/homelab-data
 
-# Configs sind bereits an der richtigen Stelle durch Git
+ls -la /opt/homelab-data/
+# Sollte zeigen: traefik/, headscale/, postgres/, uptime-kuma/, etc.
+```
+
+**Struktur auf dem Server:**
+```
+/opt/homelab-repo/                    # Git Repository (komplett)
+├── .github/
+├── terraform/
+└── hetzner/                          # ← Configs
+
+/opt/homelab -> /opt/homelab-repo/hetzner    # Symlink (Arbeitsverzeichnis)
+
+/opt/homelab-data/                    # Persistente Daten (NICHT in Git!)
+├── traefik/certs/
+├── headscale/
+├── postgres/
+└── ...
+
+/opt/homelab/data -> /opt/homelab-data       # Symlink (für docker-compose)
 ```
 
 ### 4.4 .env Datei erstellen
@@ -225,15 +249,18 @@ server:
   cookie_secret: f7e6d5c4b3a2918273645566778899aa  # ← Hier ersetzen!
 ```
 
-### 4.7 Traefik Zertifikat-Datei vorbereiten
+### 4.7 Traefik Zertifikat-Datei prüfen
+
+Die acme.json wurde bereits von Cloud-Init erstellt:
 
 ```bash
-# Verzeichnis erstellen falls nicht vorhanden
-mkdir -p data/traefik/certs
+# Prüfen ob vorhanden und korrekte Berechtigungen
+ls -la /opt/homelab-data/traefik/certs/acme.json
+# Sollte zeigen: -rw------- (600)
 
-# Leere acme.json mit richtigen Berechtigungen
-touch data/traefik/certs/acme.json
-chmod 600 data/traefik/certs/acme.json
+# Falls nicht vorhanden oder falsche Berechtigungen:
+touch /opt/homelab-data/traefik/certs/acme.json
+chmod 600 /opt/homelab-data/traefik/certs/acme.json
 ```
 
 ## Teil 5: Services starten
@@ -416,7 +443,7 @@ docker compose logs traefik | grep -i "acme"
 curl -I http://headscale.homelab-external.robinwerner.net
 
 # acme.json Berechtigungen
-ls -la data/traefik/certs/
+ls -la /opt/homelab-data/traefik/certs/
 # Muss 600 sein!
 ```
 
@@ -451,19 +478,22 @@ docker exec -it postgres psql -U headscale -d headscale
 ### Backup erstellen
 
 ```bash
-cd /opt/homelab
-
-# Daten-Verzeichnis sichern
-tar -czvf backup-$(date +%Y%m%d).tar.gz data/
+# Daten-Verzeichnis sichern (NICHT das Git-Repo, nur die Daten!)
+cd /opt
+tar -czvf backup-$(date +%Y%m%d).tar.gz homelab-data/
 
 # Oder nur PostgreSQL:
 docker exec postgres pg_dump -U headscale headscale > backup-db-$(date +%Y%m%d).sql
+
+# .env Datei separat sichern (enthält Secrets!)
+cp /opt/homelab/.env /root/backup-env-$(date +%Y%m%d)
 ```
 
 ### Restore
 
 ```bash
 # Daten wiederherstellen
+cd /opt
 tar -xzvf backup-20240101.tar.gz
 
 # PostgreSQL restore
@@ -490,9 +520,12 @@ docker image prune -f
 ### Config-Änderungen deployen
 
 ```bash
-# Auf dem Server
-cd /opt/homelab
+# Git Repository aktualisieren
+cd /opt/homelab-repo
 git pull
+
+# Änderungen sind sofort in /opt/homelab/ verfügbar (Symlink)
+cd /opt/homelab
 
 # Betroffene Services neu starten
 docker compose restart headscale  # z.B. nach ACL-Änderungen
@@ -503,11 +536,14 @@ docker compose restart headscale  # z.B. nach ACL-Änderungen
 - [ ] GitHub Secrets konfiguriert
 - [ ] Terraform erfolgreich ausgeführt
 - [ ] Deploy Key zu GitHub hinzugefügt
+- [ ] Repository geklont nach /opt/homelab-repo
+- [ ] Symlink /opt/homelab erstellt
+- [ ] Symlink /opt/homelab/data erstellt
 - [ ] Secrets generiert und notiert
 - [ ] .env Datei erstellt und ausgefüllt
 - [ ] headscale/config.yaml: PostgreSQL Passwort eingetragen
 - [ ] headplane/config.yaml: Cookie Secret eingetragen
-- [ ] acme.json erstellt mit Berechtigung 600
+- [ ] acme.json vorhanden mit Berechtigung 600
 - [ ] `docker compose up -d` erfolgreich
 - [ ] Headscale User "homelab" erstellt
 - [ ] Headscale API Key generiert und in .env eingetragen

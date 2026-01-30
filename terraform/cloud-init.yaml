@@ -130,23 +130,27 @@ runcmd:
   # =========================================================================
   # 4.4 ORDNERSTRUKTUR
   # =========================================================================
-  # /opt/homelab/         -> Configs und docker-compose.yml
-  # /opt/homelab/data/    -> Persistente Daten der Container (für Backups)
-  # /opt/homelab-repo/    -> Git Repository (zum Updaten)
+  # /opt/homelab-repo/                    -> Git Repository (komplettes Repo)
+  # /opt/homelab -> /opt/homelab-repo/hetzner  -> Symlink (Arbeitsverzeichnis)
+  # /opt/homelab-data/                    -> Persistente Daten (AUSSERHALB Git!)
+  # /opt/homelab/data -> /opt/homelab-data     -> Symlink (docker-compose nutzt ./data/)
   # =========================================================================
-  - mkdir -p /opt/homelab
-  - mkdir -p /opt/homelab/data/traefik/certs
-  - mkdir -p /opt/homelab/data/headscale
-  - mkdir -p /opt/homelab/data/headplane
-  - mkdir -p /opt/homelab/data/uptime-kuma
-  - mkdir -p /opt/homelab/data/ntfy/cache
-  - mkdir -p /opt/homelab/data/ntfy/data
-  - mkdir -p /opt/homelab/data/healthchecks
-  - mkdir -p /opt/homelab/data/tailscale
+
+  # Verzeichnisse erstellen
+  - mkdir -p /opt/homelab-repo
+  - mkdir -p /opt/homelab-data/traefik/certs
+  - mkdir -p /opt/homelab-data/headscale
+  - mkdir -p /opt/homelab-data/headplane
+  - mkdir -p /opt/homelab-data/postgres
+  - mkdir -p /opt/homelab-data/uptime-kuma
+  - mkdir -p /opt/homelab-data/ntfy/cache
+  - mkdir -p /opt/homelab-data/ntfy/data
+  - mkdir -p /opt/homelab-data/healthchecks
+  - mkdir -p /opt/homelab-data/tailscale
 
   # acme.json für Let's Encrypt Zertifikate (MUSS 600 sein!)
-  - touch /opt/homelab/data/traefik/certs/acme.json
-  - chmod 600 /opt/homelab/data/traefik/certs/acme.json
+  - touch /opt/homelab-data/traefik/certs/acme.json
+  - chmod 600 /opt/homelab-data/traefik/certs/acme.json
 
   # =========================================================================
   # 4.5 ABSCHLUSS

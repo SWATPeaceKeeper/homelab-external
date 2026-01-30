@@ -77,7 +77,7 @@ output "next_steps" {
     Der Server ist provisioniert mit:
     - Docker installiert
     - Firewall konfiguriert (SSH, HTTP, HTTPS, Headscale)
-    - Ordnerstruktur unter /opt/homelab/ erstellt
+    - Daten-Verzeichnis unter /opt/homelab-data/ erstellt
 
     ============================================================
     MANUELLE KONFIGURATION ERFORDERLICH
@@ -90,21 +90,26 @@ output "next_steps" {
        - Allow write access: NEIN (nur read)
 
     2. SSH ZUM SERVER:
-       ${hcloud_server.homelab.ipv4_address}
+       ssh root@${hcloud_server.homelab.ipv4_address}
 
     3. CLOUD-INIT ABWARTEN (ca. 2-3 Minuten):
        tail -f /var/log/cloud-init-output.log
        # Warten bis "Cloud-Init abgeschlossen" erscheint
 
-    4. REPOSITORY KLONEN:
+    4. REPOSITORY KLONEN UND SYMLINKS ERSTELLEN:
        git clone <REPO_SSH_URL> /opt/homelab-repo
+       ln -s /opt/homelab-repo/hetzner /opt/homelab
+       ln -s /opt/homelab-data /opt/homelab/data
 
-    5. CONFIGS KOPIEREN:
-       cp -r /opt/homelab-repo/hetzner/* /opt/homelab/
+    5. .ENV DATEI ERSTELLEN:
+       cd /opt/homelab
+       cp .env.example .env
+       nano .env
+       # Secrets mit: terraform output -json generated_secrets
 
-    6. .ENV DATEI ERSTELLEN:
-       Siehe SETUP.md im Repository für Vorlage.
-       Secrets mit: terraform output -json generated_secrets
+    6. CONFIGS ANPASSEN:
+       # PostgreSQL Passwort in headscale/config.yaml eintragen
+       # Cookie Secret in headplane/config.yaml eintragen
 
     7. DOCKER COMPOSE STARTEN:
        cd /opt/homelab && docker compose up -d
@@ -116,7 +121,7 @@ output "next_steps" {
        docker compose restart headplane
 
     ============================================================
-    DETAILLIERTE ANLEITUNG: Siehe SETUP.md im Repository
+    DETAILLIERTE ANLEITUNG: Siehe hetzner/SETUP.md im Repository
     ============================================================
   EOT
 }
