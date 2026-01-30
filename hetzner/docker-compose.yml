@@ -102,6 +102,10 @@ services:
     depends_on:
       headscale-postgres:
         condition: service_healthy
+    environment:
+      # Überschreibt database.postgres.pass aus config.yaml
+      # So bleibt das Passwort in .env und nicht in der Config-Datei
+      - HEADSCALE_DATABASE_POSTGRES_PASS=${POSTGRES_PASSWORD}
     volumes:
       - ./headscale/config.yaml:/etc/headscale/config.yaml
       - ./headscale/acl.json:/etc/headscale/acl.json
@@ -158,6 +162,8 @@ services:
       - ./headscale/dns_records.json:/etc/headscale/dns_records.json
       - ./headscale/acl.json:/etc/headscale/acl.json
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Cookie Secret aus Datei (nicht in Git)
+      - ./data/secrets/cookie_secret:/run/secrets/cookie_secret:ro
     depends_on:
       - headscale
     healthcheck:

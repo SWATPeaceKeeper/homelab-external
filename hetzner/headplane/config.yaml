@@ -26,9 +26,13 @@ headscale:
 # host: Auf welcher Adresse Headplane lauscht (0.0.0.0 = alle)
 # port: Port für die Web-Oberfläche
 #
-# cookie_secret: Geheimnis für Session-Cookies
-#                MUSS exakt 32 Zeichen lang sein!
-#                Generieren mit: openssl rand -hex 16
+# cookie_secret_path: Pfad zur Datei mit dem Session-Cookie-Secret
+#                     Das Secret MUSS exakt 32 Zeichen lang sein!
+#                     Generieren mit: openssl rand -hex 16 > /path/to/secret
+#
+#                     HINWEIS: Wir nutzen cookie_secret_path statt cookie_secret,
+#                     damit das Secret nicht in Git landet.
+#                     Die Datei wird aus ./data/secrets/cookie_secret gemountet.
 #
 # cookie_secure: true = Cookies nur über HTTPS senden
 #                Da Traefik HTTPS macht, kann das false bleiben
@@ -37,7 +41,7 @@ headscale:
 server:
   host: 0.0.0.0
   port: 3000
-  cookie_secret: REPLACE_WITH_32_CHARACTER_SECRET
+  cookie_secret_path: /run/secrets/cookie_secret
   cookie_secure: false
 
 # -----------------------------------------------------------------------------

@@ -142,6 +142,7 @@ runcmd:
   - mkdir -p /opt/homelab-data/headscale
   - mkdir -p /opt/homelab-data/headscale-postgres
   - mkdir -p /opt/homelab-data/headplane
+  - mkdir -p /opt/homelab-data/secrets
   - mkdir -p /opt/homelab-data/uptime-kuma
   - mkdir -p /opt/homelab-data/ntfy/cache
   - mkdir -p /opt/homelab-data/ntfy/data
@@ -152,6 +153,10 @@ runcmd:
   # acme.json für Let's Encrypt Zertifikate (MUSS 600 sein!)
   - touch /opt/homelab-data/traefik/certs/acme.json
   - chmod 600 /opt/homelab-data/traefik/certs/acme.json
+
+  # Cookie Secret für Headplane generieren (32 Zeichen hex)
+  - openssl rand -hex 16 > /opt/homelab-data/secrets/cookie_secret
+  - chmod 600 /opt/homelab-data/secrets/cookie_secret
 
   # =========================================================================
   # 4.5 ABSCHLUSS

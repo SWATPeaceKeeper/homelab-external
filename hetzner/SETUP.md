@@ -193,17 +193,15 @@ Fülle die Werte aus:
 DOMAIN=robinwerner.net
 SUBDOMAIN_PREFIX=homelab-external
 
-# Traefik (htpasswd Ausgabe von oben)
-TRAEFIK_DASHBOARD_AUTH=admin:$apr1$...
+# Traefik (htpasswd Ausgabe von oben - WICHTIG: $ mit $$ escapen!)
+TRAEFIK_DASHBOARD_AUTH=admin:$$apr1$$xyz...
 
 # PostgreSQL (openssl rand -hex 16 von oben)
+# HINWEIS: Wird automatisch an Headscale übergeben, keine manuelle Config-Änderung nötig!
 POSTGRES_PASSWORD=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
 
 # Headscale (wird später ausgefüllt)
 HEADSCALE_API_KEY=
-
-# Headplane Cookie Secret (openssl rand -hex 16 von oben)
-COOKIE_SECRET=f7e6d5c4b3a2918273645566778899aa
 
 # Tailscale (wird später ausgefüllt)
 TS_AUTHKEY=
@@ -215,41 +213,26 @@ HEALTHCHECKS_SECRET=1234567890abcdef...
 TZ=Europe/Berlin
 ```
 
-### 4.5 Headscale Config anpassen
+**Hinweis zu Secrets:**
+- **PostgreSQL Passwort**: Wird automatisch via Environment Variable an Headscale übergeben
+- **Headplane Cookie Secret**: Wurde bereits von Cloud-Init generiert in `./data/secrets/cookie_secret`
 
-Das PostgreSQL Passwort muss auch in der Headscale Config eingetragen werden:
+### 4.5 Cookie Secret prüfen (optional)
 
-```bash
-nano headscale/config.yaml
-```
-
-Suche nach `REPLACE_WITH_POSTGRES_PASSWORD` und ersetze es mit dem gleichen Passwort wie in `.env`:
-
-```yaml
-database:
-  type: postgres
-  postgres:
-    host: postgres
-    port: 5432
-    name: headscale
-    user: headscale
-    pass: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6  # ← Hier ersetzen!
-```
-
-### 4.6 Headplane Config anpassen
+Das Cookie Secret für Headplane wurde von Cloud-Init automatisch generiert:
 
 ```bash
-nano headplane/config.yaml
+# Prüfen ob vorhanden
+cat /opt/homelab-data/secrets/cookie_secret
+# Sollte 32 Zeichen zeigen
+
+# Falls nicht vorhanden, manuell erstellen:
+mkdir -p /opt/homelab-data/secrets
+openssl rand -hex 16 > /opt/homelab-data/secrets/cookie_secret
+chmod 600 /opt/homelab-data/secrets/cookie_secret
 ```
 
-Ersetze `REPLACE_WITH_32_CHARACTER_SECRET` mit dem Cookie Secret:
-
-```yaml
-server:
-  cookie_secret: f7e6d5c4b3a2918273645566778899aa  # ← Hier ersetzen!
-```
-
-### 4.7 Traefik Zertifikat-Datei prüfen
+### 4.6 Traefik Zertifikat-Datei prüfen
 
 Die acme.json wurde bereits von Cloud-Init erstellt:
 
@@ -539,10 +522,9 @@ docker compose restart headscale  # z.B. nach ACL-Änderungen
 - [ ] Repository geklont nach /opt/homelab-repo
 - [ ] Symlink /opt/homelab erstellt
 - [ ] Symlink /opt/homelab/data erstellt
-- [ ] Secrets generiert und notiert
+- [ ] Secrets generiert (POSTGRES_PASSWORD, HEALTHCHECKS_SECRET, TRAEFIK_DASHBOARD_AUTH)
 - [ ] .env Datei erstellt und ausgefüllt
-- [ ] headscale/config.yaml: PostgreSQL Passwort eingetragen
-- [ ] headplane/config.yaml: Cookie Secret eingetragen
+- [ ] Cookie Secret vorhanden (/opt/homelab-data/secrets/cookie_secret)
 - [ ] acme.json vorhanden mit Berechtigung 600
 - [ ] `docker compose up -d` erfolgreich
 - [ ] Headscale User "homelab" erstellt

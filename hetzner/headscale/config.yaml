@@ -91,11 +91,11 @@ derp:
 # DATABASE
 # -----------------------------------------------------------------------------
 # PostgreSQL für robuste Produktion.
-# Container Name "postgres" wird im Docker-Netzwerk aufgelöst.
+# Container Name "headscale-postgres" wird im Docker-Netzwerk aufgelöst.
 #
-# WICHTIG: Ersetze REPLACE_WITH_POSTGRES_PASSWORD mit dem gleichen Passwort
-#          wie in der .env Datei (POSTGRES_PASSWORD)!
-#          Generieren mit: openssl rand -hex 16
+# HINWEIS: Das Passwort wird via Environment Variable überschrieben!
+#          HEADSCALE_DATABASE_POSTGRES_PASS kommt aus .env (POSTGRES_PASSWORD)
+#          Hier muss NICHTS manuell eingetragen werden.
 # -----------------------------------------------------------------------------
 database:
   type: postgres
@@ -104,7 +104,7 @@ database:
     port: 5432
     name: headscale
     user: headscale
-    pass: REPLACE_WITH_POSTGRES_PASSWORD
+    pass: "from-environment-variable"
     ssl: disable
     max_open_conns: 10
     max_idle_conns: 5
