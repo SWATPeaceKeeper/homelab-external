@@ -152,11 +152,10 @@ runcmd:
   # 4.5 ABSCHLUSS
   # =========================================================================
   - echo "========================================" >> /var/log/cloud-init-complete.log
-  - echo "Cloud-Init abgeschlossen: $(date)" >> /var/log/cloud-init-complete.log
+  - 'echo "Cloud-Init abgeschlossen: $(date)" >> /var/log/cloud-init-complete.log'
   - echo "========================================" >> /var/log/cloud-init-complete.log
-  - echo "" >> /var/log/cloud-init-complete.log
-  - echo "Server ist bereit für manuelle Konfiguration." >> /var/log/cloud-init-complete.log
-  - echo "Siehe SETUP.md im Repository für nächste Schritte." >> /var/log/cloud-init-complete.log
+  - echo "Server ist bereit fuer manuelle Konfiguration." >> /var/log/cloud-init-complete.log
+  - echo "Siehe SETUP.md im Repository fuer naechste Schritte." >> /var/log/cloud-init-complete.log
 
 # -----------------------------------------------------------------------------
 # 5. SYSTEM-KONFIGURATION
