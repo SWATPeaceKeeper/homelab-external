@@ -3,11 +3,25 @@
 # ============================================================================
 # Standort: Hetzner vServer
 # Pfad auf Server: /opt/homelab/docker-compose.yml
+#
+# VOLUME-STRUKTUR:
+# - Configs:  ./traefik/, ./headscale/, ./headplane/ (aus Git Repository)
+# - Daten:    ./data/ (persistente Daten, für Backups)
+#
+# NETZWERKE:
+# - proxy:    Für Services die von außen erreichbar sein sollen
+# - internal: Für interne Kommunikation zwischen Services
 # ============================================================================
 
 services:
   # =========================================================================
-  # Reverse Proxy - Traefik
+  # TRAEFIK - Reverse Proxy & SSL
+  # =========================================================================
+  # Traefik ist der zentrale Eingangspunkt für alle HTTP/HTTPS Anfragen.
+  # Er kümmert sich um:
+  # - SSL-Zertifikate (Let's Encrypt)
+  # - Routing zu den einzelnen Services
+  # - HTTP → HTTPS Redirect
   # =========================================================================
   traefik:
     image: traefik:v3.0
@@ -16,70 +30,119 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
+      # HTTP (wird zu HTTPS weitergeleitet)
       - "80:80"
+      # HTTPS (Haupteingang)
       - "443:443"
-      - "8080:8080"     # Headscale internal port
-      - "3478:3478/udp" # DERP/STUN
-      - "3478:3478/tcp" # DERP fallback
+      # Headscale DERP/STUN (für VPN Performance)
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
     volumes:
+      # Docker Socket (damit Traefik Container erkennt) - READ ONLY!
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Traefik Konfiguration
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/config:/etc/traefik/config:ro
-      - ./traefik/certs:/etc/traefik/certs
+      # SSL Zertifikate (DATEN - wird von Traefik geschrieben)
+      - ./data/traefik/certs:/etc/traefik/certs
+      # Access Logs
       - /var/log/traefik:/var/log/traefik
     networks:
       - proxy
     labels:
       - "traefik.enable=true"
       # Dashboard (optional - für Debugging)
+      # ACHTUNG: Ändere das Passwort! Generieren mit: htpasswd -nb admin DEINPASSWORT
       - "traefik.http.routers.dashboard.rule=Host(`traefik.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
       - "traefik.http.routers.dashboard.tls=true"
       - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=auth"
-      # Basic Auth - Passwort mit: htpasswd -nb admin PASSWORT
-      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$ruca84Hq$$mbjdMZBAG.KWn7vfN/SNK/"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
 
   # =========================================================================
-  # Headscale - VPN Coordination Server
+  # POSTGRESQL - Datenbank für Headscale
+  # =========================================================================
+  # PostgreSQL ist die empfohlene Datenbank für Headscale in Produktion.
+  # Robuster als SQLite, besonders bei vielen Nodes.
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=headscale
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=headscale
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U headscale"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================================================================
+  # HEADSCALE - VPN Coordination Server
+  # =========================================================================
+  # Headscale ist die selbst-gehostete Alternative zu Tailscale's
+  # Koordinationsserver. Er verwaltet:
+  # - Benutzer und Geräte im VPN
+  # - Schlüsselaustausch
+  # - ACL Regeln (wer darf wohin)
+  #
+  # WICHTIG: Nach dem ersten Start musst du einen User erstellen:
+  # docker exec headscale headscale users create homelab
   # =========================================================================
   headscale:
     image: headscale/headscale:latest
     container_name: headscale
     restart: unless-stopped
     command: serve
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
-      - ./headscale/config:/etc/headscale
-      - ./headscale/data:/var/lib/headscale
+      # Konfiguration (aus Git)
+      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
+      - ./headscale/acl.json:/etc/headscale/acl.json:ro
+      # Daten (Keys, etc. - Datenbank ist jetzt in PostgreSQL)
+      - ./data/headscale:/var/lib/headscale
     networks:
       - proxy
       - internal
     labels:
       - "traefik.enable=true"
-      # HTTP API
+      # Haupt-Router für API und Web
       - "traefik.http.routers.headscale.rule=Host(`headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
       - "traefik.http.routers.headscale.tls=true"
       - "traefik.http.routers.headscale.tls.certresolver=letsencrypt"
       - "traefik.http.routers.headscale.entrypoints=websecure"
       - "traefik.http.services.headscale.loadbalancer.server.port=8080"
-      # Noise Protocol für Tailscale Clients (gRPC-ähnlich)
-      - "traefik.http.routers.headscale-noise.rule=Host(`headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}`) && PathPrefix(`/ts2021`)"
-      - "traefik.http.routers.headscale-noise.tls=true"
-      - "traefik.http.routers.headscale-noise.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.headscale-noise.service=headscale"
 
   # =========================================================================
-  # Headplane - VPN Web UI
+  # HEADPLANE - VPN Web UI
+  # =========================================================================
+  # Headplane ist eine Web-Oberfläche für Headscale.
+  # Damit kannst du Benutzer, Geräte und Einstellungen verwalten.
+  #
+  # WICHTIG: Benötigt einen Headscale API Key:
+  # docker exec headscale headscale apikeys create --expiration 365d
+  # Dann in .env eintragen: HEADSCALE_API_KEY=...
   # =========================================================================
   headplane:
     image: ghcr.io/tale/headplane:latest
     container_name: headplane
     restart: unless-stopped
-    environment:
-      - COOKIE_SECRET=${COOKIE_SECRET}
-      - HEADSCALE_API_KEY=${HEADSCALE_API_KEY}
     volumes:
+      # Konfiguration
       - ./headplane/config.yaml:/etc/headplane/config.yaml:ro
+      # Headscale Config (für Integration)
+      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
+      # Daten
+      - ./data/headplane:/var/lib/headplane
     depends_on:
       - headscale
     networks:
@@ -93,7 +156,17 @@ services:
       - "traefik.http.services.headplane.loadbalancer.server.port=3000"
 
   # =========================================================================
-  # Tailscale Client - Zugriff auf Homelab
+  # TAILSCALE CLIENT - Verbindung zum Homelab
+  # =========================================================================
+  # Dieser Container verbindet den Hetzner Server mit deinem VPN.
+  # Dadurch können die Monitoring-Services (Uptime Kuma etc.)
+  # deine internen Homelab-Dienste erreichen.
+  #
+  # SETUP nach Headscale-Konfiguration:
+  # 1. Pre-Auth Key erstellen:
+  #    docker exec headscale headscale preauthkeys create --user homelab --expiration 24h
+  # 2. Key in .env eintragen: TS_AUTHKEY=...
+  # 3. Container neu starten
   # =========================================================================
   tailscale:
     image: tailscale/tailscale:latest
@@ -104,24 +177,27 @@ services:
       - NET_ADMIN
       - SYS_MODULE
     volumes:
-      - ./tailscale:/var/lib/tailscale
+      - ./data/tailscale:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_EXTRA_ARGS=--login-server=https://headscale.${SUBDOMAIN_PREFIX}.${DOMAIN} --accept-dns=false
-      # Pre-Auth Key (einmalig nach Headscale-Setup)
-      # - TS_AUTHKEY=hskey-...
+      # Pre-Auth Key (nach Headscale-Setup eintragen)
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
     network_mode: host
 
   # =========================================================================
-  # Uptime Kuma - Uptime Monitoring
+  # UPTIME KUMA - Uptime Monitoring
+  # =========================================================================
+  # Überwacht die Erreichbarkeit deiner Services.
+  # Kann Benachrichtigungen senden wenn etwas down ist.
   # =========================================================================
   uptime-kuma:
     image: louislam/uptime-kuma:latest
     container_name: uptime-kuma
     restart: unless-stopped
     volumes:
-      - ./uptime-kuma:/app/data
+      - ./data/uptime-kuma:/app/data
     networks:
       - proxy
     labels:
@@ -132,7 +208,14 @@ services:
       - "traefik.http.services.uptime.loadbalancer.server.port=3001"
 
   # =========================================================================
-  # ntfy - Push Notifications
+  # NTFY - Push Notifications
+  # =========================================================================
+  # Selbst-gehosteter Push-Notification Server.
+  # Kann von allen deinen Services genutzt werden um Benachrichtigungen
+  # an dein Handy zu senden.
+  #
+  # SETUP nach Start:
+  # docker exec -it ntfy ntfy user add --role=admin admin
   # =========================================================================
   ntfy:
     image: binwiederhier/ntfy:latest
@@ -140,7 +223,7 @@ services:
     restart: unless-stopped
     command: serve
     environment:
-      - TZ=${TZ}
+      - TZ=${TZ:-Europe/Berlin}
       - NTFY_BASE_URL=https://ntfy.${SUBDOMAIN_PREFIX}.${DOMAIN}
       - NTFY_UPSTREAM_BASE_URL=https://ntfy.sh
       - NTFY_AUTH_DEFAULT_ACCESS=deny-all
@@ -148,8 +231,8 @@ services:
       - NTFY_BEHIND_PROXY=true
       - NTFY_ENABLE_SIGNUP=false
     volumes:
-      - ./ntfy/cache:/var/cache/ntfy
-      - ./ntfy/data:/var/lib/ntfy
+      - ./data/ntfy/cache:/var/cache/ntfy
+      - ./data/ntfy/data:/var/lib/ntfy
     networks:
       - proxy
     labels:
@@ -160,7 +243,10 @@ services:
       - "traefik.http.services.ntfy.loadbalancer.server.port=80"
 
   # =========================================================================
-  # Healthchecks - Cronjob Monitoring
+  # HEALTHCHECKS - Cronjob Monitoring
+  # =========================================================================
+  # Überwacht ob deine Cronjobs/Scheduled Tasks laufen.
+  # Jeder Job pingt eine URL - wenn der Ping ausbleibt, wirst du benachrichtigt.
   # =========================================================================
   healthchecks:
     image: healthchecks/healthchecks:latest
@@ -180,7 +266,7 @@ services:
       - SITE_NAME=Homelab Healthchecks
       - SITE_ROOT=https://hc.${SUBDOMAIN_PREFIX}.${DOMAIN}
     volumes:
-      - ./healthchecks:/data
+      - ./data/healthchecks:/data
     networks:
       - proxy
     labels:
@@ -191,12 +277,14 @@ services:
       - "traefik.http.services.healthchecks.loadbalancer.server.port=8000"
 
 # =============================================================================
-# Networks
+# NETZWERKE
 # =============================================================================
 networks:
+  # Für Services die von außen erreichbar sein sollen
   proxy:
     name: proxy
     driver: bridge
+  # Für interne Kommunikation (z.B. Headplane → Headscale)
   internal:
     name: internal
     driver: bridge

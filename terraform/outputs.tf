@@ -2,6 +2,9 @@
 # Homelab External Infrastructure - Outputs
 # ============================================================================
 
+# -----------------------------------------------------------------------------
+# Server Information
+# -----------------------------------------------------------------------------
 output "server_ipv4" {
   description = "IPv4 Adresse des Hetzner Servers"
   value       = hcloud_server.homelab.ipv4_address
@@ -34,7 +37,7 @@ output "github_deploy_key" {
 # DNS URLs
 # -----------------------------------------------------------------------------
 output "urls" {
-  description = "URLs der Dienste"
+  description = "URLs der Dienste (nach vollständiger Konfiguration)"
   value = {
     headscale    = "https://headscale.${var.subdomain_prefix}.${var.domain}"
     vpn_ui       = "https://vpn.${var.subdomain_prefix}.${var.domain}"
@@ -48,8 +51,11 @@ output "urls" {
 # -----------------------------------------------------------------------------
 # Generierte Secrets
 # -----------------------------------------------------------------------------
+# Diese Secrets werden von Terraform generiert und müssen manuell in die
+# .env Datei auf dem Server eingetragen werden.
+# -----------------------------------------------------------------------------
 output "generated_secrets" {
-  description = "Generierte Secrets (werden automatisch in .env auf Server geschrieben)"
+  description = "Generierte Secrets - in .env auf Server eintragen!"
   sensitive   = true
   value = {
     cookie_secret       = random_password.cookie_secret.result
@@ -61,46 +67,56 @@ output "generated_secrets" {
 # Nächste Schritte
 # -----------------------------------------------------------------------------
 output "next_steps" {
-  description = "Nächste Schritte nach dem Deployment"
+  description = "Nächste Schritte nach dem Terraform Deployment"
   value       = <<-EOT
 
     ============================================================
-    NÄCHSTE SCHRITTE
+    TERRAFORM DEPLOYMENT ABGESCHLOSSEN
     ============================================================
 
-    1. WICHTIG - Deploy Key bei GitHub hinzufügen:
+    Der Server ist provisioniert mit:
+    - Docker installiert
+    - Firewall konfiguriert (SSH, HTTP, HTTPS, Headscale)
+    - Ordnerstruktur unter /opt/homelab/ erstellt
+
+    ============================================================
+    MANUELLE KONFIGURATION ERFORDERLICH
+    ============================================================
+
+    1. DEPLOY KEY BEI GITHUB HINZUFÜGEN:
        - Gehe zu: GitHub Repo → Settings → Deploy keys → Add deploy key
        - Title: "Homelab Server"
-       - Key: (siehe output "github_deploy_key")
+       - Key: Siehe Output "github_deploy_key"
        - Allow write access: NEIN (nur read)
 
-    2. SSH zum Server:
-       ssh root@${hcloud_server.homelab.ipv4_address}
+    2. SSH ZUM SERVER:
+       ${hcloud_server.homelab.ipv4_address}
 
-    3. Warte bis Cloud-Init fertig ist (2-3 Minuten):
+    3. CLOUD-INIT ABWARTEN (ca. 2-3 Minuten):
        tail -f /var/log/cloud-init-output.log
+       # Warten bis "Cloud-Init abgeschlossen" erscheint
 
-    4. Prüfe ob alle Container laufen:
-       cd /opt/homelab && docker compose ps
+    4. REPOSITORY KLONEN:
+       git clone <REPO_SSH_URL> /opt/homelab-repo
 
-    5. Headscale Namespace erstellen:
-       docker exec headscale headscale namespaces create homelab
+    5. CONFIGS KOPIEREN:
+       cp -r /opt/homelab-repo/hetzner/* /opt/homelab/
 
-    6. API-Key für Headplane generieren:
+    6. .ENV DATEI ERSTELLEN:
+       Siehe SETUP.md im Repository für Vorlage.
+       Secrets mit: terraform output -json generated_secrets
+
+    7. DOCKER COMPOSE STARTEN:
+       cd /opt/homelab && docker compose up -d
+
+    8. HEADSCALE KONFIGURIEREN:
+       docker exec headscale headscale users create homelab
        docker exec headscale headscale apikeys create --expiration 365d
+       # API Key in .env eintragen, dann:
+       docker compose restart headplane
 
-    7. API-Key in /opt/homelab/.env eintragen:
-       nano /opt/homelab/.env
-       # HEADSCALE_API_KEY=<dein-key>
-
-    8. Container neu starten:
-       docker compose down && docker compose up -d
-
-    9. Services testen:
-       - https://headscale.${var.subdomain_prefix}.${var.domain}
-       - https://vpn.${var.subdomain_prefix}.${var.domain}
-       - https://uptime.${var.subdomain_prefix}.${var.domain}
-
+    ============================================================
+    DETAILLIERTE ANLEITUNG: Siehe SETUP.md im Repository
     ============================================================
   EOT
 }

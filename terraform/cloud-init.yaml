@@ -1,33 +1,55 @@
 #cloud-config
 # ============================================================================
-# Homelab External Server - Cloud-Init Configuration
+# Homelab External Server - Cloud-Init (Basis-Provisionierung)
 # ============================================================================
-# Dieses Script macht nur das Basis-Setup.
-# Die eigentlichen Configs kommen aus dem geklonten Git Repository.
+#
+# Diese Datei macht NUR das Basis-Setup des Servers:
+# - System-Updates
+# - Docker Installation
+# - Firewall
+# - Ordnerstruktur
+#
+# Die eigentliche Konfiguration (Configs, Docker Compose, etc.) erfolgt
+# MANUELL nach dem Server-Setup. Siehe SETUP.md für Anleitung.
+#
 # ============================================================================
 
 # -----------------------------------------------------------------------------
-# System-Updates und Pakete
+# 1. SYSTEM-UPDATES
+# -----------------------------------------------------------------------------
+# Aktualisiert Paketlisten und installiert verfügbare Updates beim ersten Boot.
+# Das dauert 1-2 Minuten, stellt aber sicher dass der Server aktuell ist.
 # -----------------------------------------------------------------------------
 package_update: true
 package_upgrade: true
 
+# -----------------------------------------------------------------------------
+# 2. BASIS-PAKETE
+# -----------------------------------------------------------------------------
+# Diese Pakete werden installiert:
+# - ca-certificates, curl: Für HTTPS Downloads (Docker, etc.)
+# - git: Zum Klonen des Config-Repositories
+# - htop, vim: Nützliche Admin-Tools
+# - jq: JSON-Verarbeitung (für Scripts)
+# - fail2ban: Schutz gegen Brute-Force Angriffe
+# - ufw: Einfache Firewall
+# -----------------------------------------------------------------------------
 packages:
-  - apt-transport-https
   - ca-certificates
   - curl
-  - gnupg
-  - lsb-release
+  - git
   - htop
   - vim
-  - git
   - jq
-  - unzip
   - fail2ban
   - ufw
 
 # -----------------------------------------------------------------------------
-# SSH Deploy Key für GitHub
+# 3. SSH DEPLOY KEY FÜR GITHUB
+# -----------------------------------------------------------------------------
+# Der Private Key wird Base64-kodiert übertragen (vermeidet YAML-Probleme).
+# Damit kann der Server das private GitHub-Repository klonen.
+# Der Public Key muss als Deploy Key im GitHub Repo hinterlegt werden!
 # -----------------------------------------------------------------------------
 write_files:
   - path: /root/.ssh/deploy_key
@@ -45,105 +67,113 @@ write_files:
         StrictHostKeyChecking no
 
 # -----------------------------------------------------------------------------
-# Setup Commands
+# 4. SETUP COMMANDS
 # -----------------------------------------------------------------------------
 runcmd:
-  # --- Docker Installation ---
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+  # =========================================================================
+  # 4.1 DOCKER INSTALLATION (Ubuntu 24.04 - Aktuelle Methode 2025)
+  # =========================================================================
+  # Quelle: https://docs.docker.com/engine/install/ubuntu/
+  #
+  # Schritt 1: Keyring-Verzeichnis erstellen
+  - install -m 0755 -d /etc/apt/keyrings
+
+  # Schritt 2: Docker GPG Key herunterladen (neuer Pfad seit 2024)
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+
+  # Schritt 3: Docker Repository hinzufügen
+  - |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  # Schritt 4: Docker installieren
   - apt-get update
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-  # Docker Compose Alias
-  - ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
-
-  # Docker starten
+  # Schritt 5: Docker starten und aktivieren
   - systemctl enable docker
   - systemctl start docker
 
-  # --- Firewall konfigurieren ---
+  # Optional: Symlink für "docker-compose" Befehl (Kompatibilität)
+  - ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+
+  # =========================================================================
+  # 4.2 FIREWALL (UFW)
+  # =========================================================================
+  # Standard: Alles blockieren außer explizit erlaubte Ports
+  # =========================================================================
   - ufw default deny incoming
   - ufw default allow outgoing
+
+  # SSH (Port 22) - WICHTIG: Immer erlauben!
   - ufw allow ssh
+
+  # HTTP/HTTPS für Traefik
   - ufw allow 80/tcp
   - ufw allow 443/tcp
+
+  # Headscale DERP/STUN (für VPN-Verbindungen)
   - ufw allow 3478/udp
   - ufw allow 3478/tcp
+
+  # Firewall aktivieren
   - ufw --force enable
 
-  # --- Fail2ban starten ---
+  # =========================================================================
+  # 4.3 FAIL2BAN
+  # =========================================================================
+  # Schützt gegen Brute-Force SSH Angriffe
+  # =========================================================================
   - systemctl enable fail2ban
   - systemctl start fail2ban
 
-  # --- Repository klonen ---
-  - git clone ${repo_ssh_url} /opt/homelab-repo
-
-  # --- Configs kopieren ---
+  # =========================================================================
+  # 4.4 ORDNERSTRUKTUR
+  # =========================================================================
+  # /opt/homelab/         -> Configs und docker-compose.yml
+  # /opt/homelab/data/    -> Persistente Daten der Container (für Backups)
+  # /opt/homelab-repo/    -> Git Repository (zum Updaten)
+  # =========================================================================
   - mkdir -p /opt/homelab
-  - cp -r /opt/homelab-repo/hetzner/* /opt/homelab/
+  - mkdir -p /opt/homelab/data/traefik/certs
+  - mkdir -p /opt/homelab/data/headscale
+  - mkdir -p /opt/homelab/data/headplane
+  - mkdir -p /opt/homelab/data/uptime-kuma
+  - mkdir -p /opt/homelab/data/ntfy/cache
+  - mkdir -p /opt/homelab/data/ntfy/data
+  - mkdir -p /opt/homelab/data/healthchecks
+  - mkdir -p /opt/homelab/data/tailscale
 
-  # --- Headplane Config mit Secret befüllen ---
-  - sed -i 's/REPLACE_WITH_COOKIE_SECRET/${cookie_secret}/g' /opt/homelab/headplane/config.yaml
+  # acme.json für Let's Encrypt Zertifikate (MUSS 600 sein!)
+  - touch /opt/homelab/data/traefik/certs/acme.json
+  - chmod 600 /opt/homelab/data/traefik/certs/acme.json
 
-  - mkdir -p /opt/homelab/traefik/certs
-  - mkdir -p /opt/homelab/headscale/data
-  - mkdir -p /opt/homelab/uptime-kuma
-  - mkdir -p /opt/homelab/ntfy/{cache,data}
-  - mkdir -p /opt/homelab/healthchecks
-  - mkdir -p /opt/homelab/tailscale
-  - touch /opt/homelab/traefik/certs/acme.json
-  - chmod 600 /opt/homelab/traefik/certs/acme.json
-
-  # --- .env Datei erstellen ---
-  - |
-    cat > /opt/homelab/.env << 'ENVEOF'
-    # ==========================================================================
-    # Homelab External - Environment Variables
-    # ==========================================================================
-    # Diese Datei wurde automatisch erstellt.
-    # Secrets wurden von Terraform generiert.
-    # ==========================================================================
-
-    # Domain Konfiguration
-    DOMAIN=${domain}
-    SUBDOMAIN_PREFIX=${subdomain_prefix}
-
-    # Headscale API Key
-    # WICHTIG: Nach erstem Start generieren mit:
-    # docker exec headscale headscale apikeys create --expiration 365d
-    HEADSCALE_API_KEY=REPLACE_AFTER_FIRST_START
-
-    # Secrets (von Terraform generiert)
-    COOKIE_SECRET=${cookie_secret}
-    HEALTHCHECKS_SECRET=${healthchecks_secret}
-
-    # Timezone
-    TZ=Europe/Berlin
-    ENVEOF
-
-  # --- Docker Compose starten ---
-  - cd /opt/homelab && docker compose up -d
-
-  # --- Erfolg loggen ---
-  - echo "Cloud-init completed successfully at $(date)" >> /var/log/cloud-init-complete.log
-  - echo "Next steps:" >> /var/log/cloud-init-complete.log
-  - echo "1. SSH to server" >> /var/log/cloud-init-complete.log
-  - echo "2. docker exec headscale headscale namespaces create homelab" >> /var/log/cloud-init-complete.log
-  - echo "3. docker exec headscale headscale apikeys create --expiration 365d" >> /var/log/cloud-init-complete.log
-  - echo "4. Add API key to /opt/homelab/.env" >> /var/log/cloud-init-complete.log
-  - echo "5. docker compose restart" >> /var/log/cloud-init-complete.log
+  # =========================================================================
+  # 4.5 ABSCHLUSS
+  # =========================================================================
+  - echo "========================================" >> /var/log/cloud-init-complete.log
+  - echo "Cloud-Init abgeschlossen: $(date)" >> /var/log/cloud-init-complete.log
+  - echo "========================================" >> /var/log/cloud-init-complete.log
+  - echo "" >> /var/log/cloud-init-complete.log
+  - echo "Server ist bereit für manuelle Konfiguration." >> /var/log/cloud-init-complete.log
+  - echo "Siehe SETUP.md im Repository für nächste Schritte." >> /var/log/cloud-init-complete.log
 
 # -----------------------------------------------------------------------------
-# System Konfiguration
+# 5. SYSTEM-KONFIGURATION
 # -----------------------------------------------------------------------------
 timezone: Europe/Berlin
 locale: de_DE.UTF-8
 
-# SSH Hardening
+# SSH: Nur Key-Authentifizierung (kein Passwort)
 ssh_pwauth: false
 disable_root: false
 
-# Swap erstellen (für Low-Memory Situationen)
+# -----------------------------------------------------------------------------
+# 6. SWAP (für Low-Memory Situationen)
+# -----------------------------------------------------------------------------
+# 2GB Swap ist sinnvoll für Server mit 4GB RAM
+# Verhindert OOM-Kills bei Lastspitzen
+# -----------------------------------------------------------------------------
 swap:
   filename: /swapfile
   size: 2G

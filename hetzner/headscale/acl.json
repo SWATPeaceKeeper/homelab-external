@@ -1,0 +1,124 @@
+// ==========================================================================
+// HEADSCALE ACL (Access Control List)
+// ==========================================================================
+// Pfad auf Server: /opt/homelab/headscale/acl.json
+// Dokumentation: https://headscale.net/stable/ref/acls/
+//
+// Diese Datei definiert wer mit wem im VPN kommunizieren darf.
+// Format: HuJSON (JSON mit Kommentaren)
+//
+// WICHTIG: Nach Änderungen Headscale neu starten!
+// docker compose restart headscale
+// ==========================================================================
+
+{
+  // -------------------------------------------------------------------------
+  // GRUPPEN
+  // -------------------------------------------------------------------------
+  // Gruppen fassen Benutzer zusammen.
+  // Format: "benutzer@namespace"
+  // Namespace erstellen: docker exec headscale headscale users create homelab
+  // -------------------------------------------------------------------------
+  "groups": {
+    "group:admin": [
+      "robin@homelab"
+    ],
+    "group:server": [
+      "hetzner-server@homelab"
+    ],
+    "group:family": []
+  },
+
+  // -------------------------------------------------------------------------
+  // TAG OWNERS
+  // -------------------------------------------------------------------------
+  // Tags können Geräten zugewiesen werden.
+  // Definiert wer welche Tags vergeben darf.
+  // -------------------------------------------------------------------------
+  "tagOwners": {
+    "tag:server": ["group:admin"],
+    "tag:monitoring": ["group:admin"],
+    "tag:client": ["group:admin"]
+  },
+
+  // -------------------------------------------------------------------------
+  // HOSTS (Aliase)
+  // -------------------------------------------------------------------------
+  // Aliase für IP-Adressen oder CIDR-Bereiche.
+  // Macht ACL Regeln lesbarer.
+  // -------------------------------------------------------------------------
+  "hosts": {
+    "homelab-network": "10.0.0.0/24"
+  },
+
+  // -------------------------------------------------------------------------
+  // ACL REGELN
+  // -------------------------------------------------------------------------
+  // Definiert wer wohin verbinden darf.
+  //
+  // src: Quelle (Benutzer, Gruppe, Tag, IP)
+  // dst: Ziel mit Port ("host:port" oder "host:*")
+  //
+  // Beispiele:
+  //   "*:*" = alle Hosts, alle Ports
+  //   "homelab-network:22" = SSH zu Homelab
+  //   "homelab-network:80,443" = HTTP/HTTPS zu Homelab
+  // -------------------------------------------------------------------------
+  "acls": [
+    // Admins haben vollen Zugriff auf alles
+    {
+      "action": "accept",
+      "src": ["group:admin"],
+      "dst": ["*:*"]
+    },
+
+    // Hetzner-Server darf Homelab für Monitoring erreichen
+    {
+      "action": "accept",
+      "src": ["group:server"],
+      "dst": [
+        "homelab-network:22",
+        "homelab-network:80",
+        "homelab-network:443",
+        "homelab-network:3000",
+        "homelab-network:8080",
+        "homelab-network:8123",
+        "homelab-network:9090",
+        "homelab-network:9100"
+      ]
+    },
+
+    // Alle dürfen pingen (für Diagnose)
+    {
+      "action": "accept",
+      "src": ["*"],
+      "dst": ["*:*"],
+      "proto": "icmp"
+    },
+
+    // Familie darf Home Assistant nutzen
+    {
+      "action": "accept",
+      "src": ["group:family"],
+      "dst": [
+        "homelab-network:8123",
+        "homelab-network:80",
+        "homelab-network:443"
+      ]
+    }
+  ],
+
+  // -------------------------------------------------------------------------
+  // SSH REGELN (optional)
+  // -------------------------------------------------------------------------
+  // Ermöglicht Tailscale SSH (SSH über VPN ohne separate Keys)
+  // -------------------------------------------------------------------------
+  "ssh": [
+    {
+      "action": "accept",
+      "src": ["group:admin"],
+      "dst": ["*"],
+      "users": ["autogroup:nonroot", "root"]
+    }
+  ]
+}

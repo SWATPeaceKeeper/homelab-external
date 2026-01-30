@@ -20,15 +20,15 @@ on:
     branches:
       - main
     paths:
+      # NUR Terraform-Dateien triggern einen Build
+      # Config-Änderungen in hetzner/ werden manuell deployed
       - 'terraform/**'
-      - 'hetzner/**'
       - '.github/workflows/terraform.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'terraform/**'
-      - 'hetzner/**'
   workflow_dispatch:
     inputs:
       action:

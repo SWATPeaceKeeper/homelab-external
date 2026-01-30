@@ -1,0 +1,183 @@
+# ============================================================================
+# Headscale Configuration
+# ============================================================================
+# Pfad auf Server: /opt/homelab/headscale/config.yaml
+# Dokumentation: https://headscale.net/stable/ref/configuration/
+#
+# Headscale ist die selbst-gehostete Alternative zu Tailscale's
+# Koordinationsserver. Diese Datei konfiguriert:
+# - Auf welcher URL der Server erreichbar ist
+# - Welche IP-Bereiche für VPN-Clients verwendet werden
+# - DERP Relay Server für NAT-Traversal
+# - DNS Einstellungen
+# - ACL (Access Control) Regeln
+# ============================================================================
+
+# -----------------------------------------------------------------------------
+# SERVER URL
+# -----------------------------------------------------------------------------
+# Die öffentliche URL unter der Headscale erreichbar ist.
+# WICHTIG: Muss mit deiner tatsächlichen Domain übereinstimmen!
+# Diese URL wird den Tailscale-Clients mitgeteilt.
+# -----------------------------------------------------------------------------
+server_url: https://headscale.homelab-external.robinwerner.net
+
+# -----------------------------------------------------------------------------
+# LISTEN ADRESSEN
+# -----------------------------------------------------------------------------
+# listen_addr: Haupt-API und Web-Interface (intern, Traefik leitet hierhin)
+# metrics_listen_addr: Prometheus Metriken
+# grpc_listen_addr: gRPC API (für erweiterte Integrationen)
+# -----------------------------------------------------------------------------
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 0.0.0.0:9090
+grpc_listen_addr: 0.0.0.0:50443
+grpc_allow_insecure: false
+
+# -----------------------------------------------------------------------------
+# PRIVATE KEYS
+# -----------------------------------------------------------------------------
+# Werden automatisch generiert wenn sie nicht existieren.
+# Speicherort: /var/lib/headscale/ (data volume)
+# -----------------------------------------------------------------------------
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+# -----------------------------------------------------------------------------
+# IP PREFIXES FÜR VPN-CLIENTS
+# -----------------------------------------------------------------------------
+# Jeder VPN-Client bekommt eine IP aus diesem Bereich.
+# 100.64.0.0/10 ist der Tailscale-Standard (CGNAT Bereich).
+#
+# allocation: sequential = IPs werden der Reihe nach vergeben
+#             random = IPs werden zufällig vergeben
+# -----------------------------------------------------------------------------
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential
+
+# -----------------------------------------------------------------------------
+# DERP (Designated Encrypted Relay for Packets)
+# -----------------------------------------------------------------------------
+# DERP Server helfen wenn direkte Verbindungen nicht möglich sind (NAT, etc.)
+#
+# embedded server:
+#   - Headscale kann selbst als DERP Server fungieren
+#   - region_id: Eindeutige ID (999 = eigener Server)
+#   - stun_listen_addr: STUN Server für NAT-Traversal
+#
+# urls:
+#   - Fallback zu öffentlichen Tailscale DERP Servern
+# -----------------------------------------------------------------------------
+derp:
+  server:
+    enabled: true
+    region_id: 999
+    region_code: "homelab"
+    region_name: "Homelab DERP"
+    stun_listen_addr: "0.0.0.0:3478"
+    automatically_add_embedded_derp_region: true
+    # IPv4 wird automatisch ermittelt
+
+  # Öffentliche Tailscale DERP Server als Fallback
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+
+  auto_update_enabled: true
+  update_frequency: 24h
+
+# -----------------------------------------------------------------------------
+# DATABASE
+# -----------------------------------------------------------------------------
+# PostgreSQL für robuste Produktion.
+# Container Name "postgres" wird im Docker-Netzwerk aufgelöst.
+#
+# WICHTIG: Ersetze REPLACE_WITH_POSTGRES_PASSWORD mit dem gleichen Passwort
+#          wie in der .env Datei (POSTGRES_PASSWORD)!
+#          Generieren mit: openssl rand -hex 16
+# -----------------------------------------------------------------------------
+database:
+  type: postgres
+  postgres:
+    host: postgres
+    port: 5432
+    name: headscale
+    user: headscale
+    pass: REPLACE_WITH_POSTGRES_PASSWORD
+    ssl: disable
+    max_open_conns: 10
+    max_idle_conns: 5
+    conn_max_idle_time_secs: 3600
+
+# SQLite Alternative (für lokales Testing):
+# database:
+#   type: sqlite
+#   sqlite:
+#     path: /var/lib/headscale/db.sqlite
+
+# -----------------------------------------------------------------------------
+# DNS KONFIGURATION
+# -----------------------------------------------------------------------------
+# magic_dns: Ermöglicht Auflösung von Hostnamen im VPN
+#            z.B. "mein-laptop" statt "100.64.0.5"
+#
+# base_domain: Domain-Suffix für Magic DNS
+#              "mein-laptop.tailnet" bei base_domain: tailnet
+#
+# nameservers: DNS Server die VPN-Clients verwenden
+# -----------------------------------------------------------------------------
+dns:
+  magic_dns: true
+  base_domain: tailnet
+
+  nameservers:
+    global:
+      # Primär: Cloudflare (schnell, zuverlässig)
+      - 1.1.1.1
+      # Sekundär: Google
+      - 8.8.8.8
+      # Optional: Eigener DNS (z.B. PiHole) über VPN
+      # - 100.64.0.X  # IP deines PiHole im VPN
+
+  # Split DNS: Bestimmte Domains an bestimmte DNS Server
+  split: {}
+  # Beispiel für interne Domain:
+  # split:
+  #   home.local:
+  #     - 10.0.0.53
+
+  # Extra DNS Records im VPN
+  extra_records: []
+  # Beispiel:
+  # extra_records:
+  #   - name: "nas.tailnet"
+  #     type: "A"
+  #     value: "100.64.0.10"
+
+# -----------------------------------------------------------------------------
+# NODE EINSTELLUNGEN
+# -----------------------------------------------------------------------------
+# ephemeral_node_inactivity_timeout: Wie lange bis inaktive ephemeral Nodes
+#                                     entfernt werden
+# -----------------------------------------------------------------------------
+disable_check_updates: false
+ephemeral_node_inactivity_timeout: 30m
+
+# -----------------------------------------------------------------------------
+# LOGGING
+# -----------------------------------------------------------------------------
+log:
+  format: text    # oder 'json' für strukturierte Logs
+  level: info     # debug, info, warn, error
+
+# -----------------------------------------------------------------------------
+# POLICY / ACCESS CONTROL
+# -----------------------------------------------------------------------------
+# ACL Regeln definieren wer mit wem kommunizieren darf.
+# mode: file = ACL aus externer Datei laden
+# path: Pfad zur ACL JSON Datei
+# -----------------------------------------------------------------------------
+policy:
+  mode: file
+  path: /etc/headscale/acl.json

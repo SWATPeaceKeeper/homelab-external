@@ -88,19 +88,13 @@ resource "hcloud_firewall" "homelab" {
 # -----------------------------------------------------------------------------
 # Cloud-Init Configuration
 # -----------------------------------------------------------------------------
+# Die Cloud-Init macht nur Basis-Setup (Docker, Firewall, Ordner).
+# Configs und Services werden manuell deployed.
+# -----------------------------------------------------------------------------
 locals {
   cloud_init = templatefile("${path.module}/cloud-init.yaml", {
     # GitHub Deploy Key - Base64 encoded um YAML-Probleme zu vermeiden
     deploy_key_private_b64 = base64encode(tls_private_key.deploy_key.private_key_openssh)
-    repo_ssh_url           = var.repo_ssh_url
-
-    # Domain
-    domain           = var.domain
-    subdomain_prefix = var.subdomain_prefix
-
-    # Secrets
-    cookie_secret       = random_password.cookie_secret.result
-    healthchecks_secret = random_password.healthchecks_secret.result
   })
 }
 
