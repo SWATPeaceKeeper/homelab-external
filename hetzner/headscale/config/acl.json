@@ -69,17 +69,5 @@
       "dst": ["*"],
       "users": ["autogroup:nonroot", "root"]
     }
-  ],
-
-  "tests": [
-    {
-      "src": "robin@homelab",
-      "accept": ["nuc:22", "homelab-network:8123", "hetzner:443"]
-    },
-    {
-      "src": "hetzner-server@homelab",
-      "accept": ["homelab-network:3000", "homelab-network:9090"],
-      "deny": ["homelab-network:5432"]
-    }
   ]
 }

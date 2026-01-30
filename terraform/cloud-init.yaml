@@ -81,6 +81,10 @@ runcmd:
   # --- Configs kopieren ---
   - mkdir -p /opt/homelab
   - cp -r /opt/homelab-repo/hetzner/* /opt/homelab/
+
+  # --- Headplane Config mit Secret befüllen ---
+  - sed -i 's/REPLACE_WITH_COOKIE_SECRET/${cookie_secret}/g' /opt/homelab/headplane/config.yaml
+
   - mkdir -p /opt/homelab/traefik/certs
   - mkdir -p /opt/homelab/headscale/data
   - mkdir -p /opt/homelab/uptime-kuma
