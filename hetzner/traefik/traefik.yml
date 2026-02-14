@@ -1,42 +1,18 @@
 # ============================================================================
 # Traefik v3 - Static Configuration
 # ============================================================================
-# Pfad auf Server: /opt/homelab/traefik/traefik.yml
+# Pfad auf Server: /opt/homelab-repo/hetzner/traefik/traefik.yml
 #
-# Dies ist die STATISCHE Konfiguration von Traefik.
-# Sie wird beim Start geladen und definiert:
-# - Entry Points (Ports auf denen Traefik lauscht)
-# - Provider (woher Traefik seine Routing-Infos bekommt)
-# - Certificate Resolver (Let's Encrypt)
-#
-# Die DYNAMISCHE Konfiguration (welcher Service auf welcher Domain)
-# kommt aus den Docker Labels in docker-compose.yml
+# Statische Konfiguration: Entry Points, Provider, Certificate Resolver.
+# Dynamische Konfiguration (Routing) kommt aus Docker Labels in docker-compose.yml.
 # ============================================================================
 
-# -----------------------------------------------------------------------------
-# API / DASHBOARD
-# -----------------------------------------------------------------------------
-# Das Dashboard wird über Docker Labels in docker-compose.yml konfiguriert.
-# insecure: false bedeutet, dass das Dashboard nur über den Router erreichbar
-# ist (nicht direkt über Port 8080).
-# -----------------------------------------------------------------------------
 api:
   dashboard: true
   insecure: false
 
 # -----------------------------------------------------------------------------
 # ENTRY POINTS
-# -----------------------------------------------------------------------------
-# Entry Points definieren auf welchen Ports Traefik lauscht.
-#
-# web (Port 80):
-#   - HTTP Eingang
-#   - Leitet automatisch zu HTTPS weiter (permanent redirect)
-#   - Wird auch für Let's Encrypt HTTP Challenge genutzt
-#
-# websecure (Port 443):
-#   - HTTPS Eingang
-#   - Nutzt automatisch den "letsencrypt" Certificate Resolver
 # -----------------------------------------------------------------------------
 entryPoints:
   web:
@@ -57,17 +33,6 @@ entryPoints:
 # -----------------------------------------------------------------------------
 # PROVIDERS
 # -----------------------------------------------------------------------------
-# Provider sind Quellen für die dynamische Konfiguration.
-#
-# docker:
-#   - Liest Container Labels aus
-#   - exposedByDefault: false = nur Container mit "traefik.enable=true" Label
-#   - network: proxy = Traefik verbindet sich über dieses Netzwerk
-#
-# file (optional):
-#   - Für zusätzliche manuelle Konfiguration
-#   - Momentan nicht genutzt, aber vorbereitet
-# -----------------------------------------------------------------------------
 providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
@@ -75,101 +40,24 @@ providers:
     network: proxy
     watch: true
 
-  # Optional: Zusätzliche Konfiguration aus Dateien
-  # Erstelle Dateien in /opt/homelab/traefik/config/ für extra Routen
-  file:
-    directory: /etc/traefik/config
-    watch: true
-
 # -----------------------------------------------------------------------------
 # CERTIFICATE RESOLVERS
-# -----------------------------------------------------------------------------
-# Let's Encrypt Konfiguration für automatische SSL-Zertifikate.
-#
-# httpChallenge:
-#   - Einfachste Methode
-#   - Let's Encrypt prüft ob du die Domain kontrollierst
-#   - Erfordert Port 80 offen
-#
-# Für Wildcard-Zertifikate müsstest du dnsChallenge nutzen (auskommentiert).
 # -----------------------------------------------------------------------------
 certificatesResolvers:
   letsencrypt:
     acme:
-      # WICHTIG: Ändere diese E-Mail-Adresse!
-      # Let's Encrypt sendet Warnungen hierhin (z.B. bei Ablauf)
       email: kontakt@robinwerner.de
-
-      # Hier werden die Zertifikate gespeichert
-      # Diese Datei MUSS Berechtigung 600 haben!
       storage: /etc/traefik/certs/acme.json
-
-      # HTTP Challenge (Standard)
       httpChallenge:
         entryPoint: web
 
-      # DNS Challenge für Wildcard-Zertifikate (optional)
-      # Erfordert Cloudflare API Token
-      # dnsChallenge:
-      #   provider: cloudflare
-      #   resolvers:
-      #     - "1.1.1.1:53"
-      #     - "8.8.8.8:53"
-
 # -----------------------------------------------------------------------------
 # LOGGING
-# -----------------------------------------------------------------------------
-# Log Level: DEBUG, INFO, WARN, ERROR
-# Für Debugging auf DEBUG setzen, sonst INFO lassen.
 # -----------------------------------------------------------------------------
 log:
   level: INFO
   format: common
 
-# Access Log - Protokolliert alle HTTP Requests
 accessLog:
   filePath: /var/log/traefik/access.log
   format: json
-  bufferingSize: 100
-  filters:
-    statusCodes:
-      - "200-299"
-      - "400-499"
-      - "500-599"
-  fields:
-    defaultMode: keep
-    names:
-      ClientUsername: drop
-    headers:
-      defaultMode: keep
-      names:
-        # Sensible Header nicht loggen
-        Authorization: drop
-        Cookie: drop
-
-# -----------------------------------------------------------------------------
-# METRICS (für Prometheus)
-# -----------------------------------------------------------------------------
-# Traefik exportiert Metriken die von Prometheus abgefragt werden können.
-# Nützlich für Monitoring und Dashboards.
-# Endpoint: http://traefik:8080/metrics (intern)
-# -----------------------------------------------------------------------------
-metrics:
-  prometheus:
-    addEntryPointsLabels: true
-    addRoutersLabels: true
-    addServicesLabels: true
-    buckets:
-      - 0.1
-      - 0.3
-      - 1.2
-      - 5.0
-
-# -----------------------------------------------------------------------------
-# PING / HEALTH CHECK
-# -----------------------------------------------------------------------------
-# Ermöglicht Health Checks unter /ping
-# Nützlich für Load Balancer oder Monitoring
-# -----------------------------------------------------------------------------
-ping:
-  entryPoint: web

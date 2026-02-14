@@ -42,7 +42,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Traefik Konfiguration
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./traefik/config:/etc/traefik/config:ro
       # SSL Zertifikate (DATEN - wird von Traefik geschrieben)
       - /opt/homelab-data/traefik/certs:/etc/traefik/certs
       # Access Logs
@@ -335,6 +334,32 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # =========================================================================
+  # DOCKGE - Docker Compose Manager
+  # =========================================================================
+  # Web-basierter Docker Compose Manager.
+  # Nutzt die bestehende Traefik Basic Auth Middleware.
+  # =========================================================================
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    restart: unless-stopped
+    environment:
+      - DOCKGE_STACKS_DIR=/opt/stacks
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/homelab-data/dockge:/app/data
+      - /opt/stacks:/opt/stacks
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dockge.rule=Host(`dockge.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
+      - "traefik.http.routers.dockge.tls=true"
+      - "traefik.http.routers.dockge.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dockge.middlewares=auth"
+      - "traefik.http.services.dockge.loadbalancer.server.port=5001"
 
 # =============================================================================
 # NETZWERKE
