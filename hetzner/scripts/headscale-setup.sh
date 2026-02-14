@@ -52,8 +52,8 @@ else
   echo "Erstelle API Key..."
   API_KEY=$(docker exec "$CONTAINER" headscale apikeys create --expiration 365d 2>&1 | tail -1)
 
-  if [ -z "$API_KEY" ]; then
-    echo "FEHLER: API Key konnte nicht erstellt werden." >&2
+  if [ -z "$API_KEY" ] || [ ${#API_KEY} -lt 20 ] || echo "$API_KEY" | grep -qi "error\|warn\|fail"; then
+    echo "FEHLER: Ungültiger API Key: '${API_KEY}'" >&2
     exit 1
   fi
 

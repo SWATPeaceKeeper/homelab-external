@@ -2,7 +2,7 @@
 # Homelab External - Docker Compose
 # ============================================================================
 # Standort: Hetzner vServer
-# Pfad auf Server: /opt/homelab/docker-compose.yml
+# Pfad auf Server: /opt/homelab-repo/hetzner/docker-compose.yml
 #
 # VOLUME-STRUKTUR:
 # - Configs:  ./traefik/, ./headscale/, ./headplane/ (aus Git Repository)
@@ -64,7 +64,7 @@ services:
   # Robuster als SQLite, besonders bei vielen Nodes.
   # =========================================================================
   headscale-postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: headscale-postgres
     restart: unless-stopped
     environment:
@@ -72,7 +72,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=headscale
     volumes:
-      - /opt/homelab-data/headscale-postgres:/var/lib/postgresql
+      - /opt/homelab-data/headscale-postgres:/var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
@@ -292,6 +292,7 @@ services:
       - DB=postgres
       - DB_HOST=healthchecks-postgres
       - DB_NAME=healthchecks
+      - DB_USER=healthchecks
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN}
       - EMAIL_HOST=smtp.eu.mailgun.org
@@ -307,6 +308,7 @@ services:
       - /opt/homelab-data/healthchecks:/data
     networks:
       - proxy
+      - internal
     depends_on:
       healthchecks-postgres:
         condition: service_healthy
@@ -318,7 +320,7 @@ services:
       - "traefik.http.services.healthchecks.loadbalancer.server.port=8000"
 
   healthchecks-postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: healthchecks-postgres
     restart: unless-stopped
     environment:
@@ -326,7 +328,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=healthchecks
     volumes:
-      - /opt/homelab-data/healthchecks-postgres:/var/lib/postgresql
+      - /opt/homelab-data/healthchecks-postgres:/var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
@@ -345,6 +347,8 @@ services:
     image: louislam/dockge:1
     container_name: dockge
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       - DOCKGE_STACKS_DIR=/opt/stacks
     volumes:

@@ -1,7 +1,7 @@
 # ============================================================================
 # Headplane Configuration
 # ============================================================================
-# Pfad auf Server: /opt/homelab/headplane/config.yaml
+# Pfad auf Server: /opt/homelab-repo/hetzner/headplane/config.yaml
 # Dokumentation: https://headplane.net/configuration/
 #
 # Headplane ist eine Web-Oberfläche für Headscale.

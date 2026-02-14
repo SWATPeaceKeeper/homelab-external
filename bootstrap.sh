@@ -19,6 +19,7 @@
 #   ./bootstrap.sh
 # ============================================================================
 set -euo pipefail
+trap 'error "Bootstrap fehlgeschlagen! Prüfe den Zustand oder führe ./teardown.sh aus."' ERR
 
 # ---------------------------------------------------------------------------
 # KONFIGURATION
@@ -48,11 +49,20 @@ die()   { error "$*"; exit 1; }
 cf_api() {
   local method="$1" endpoint="$2"
   shift 2
-  curl -s -X "$method" \
+  local response
+  response=$(curl -s -X "$method" \
     "https://api.cloudflare.com/client/v4${endpoint}" \
     -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
     -H "Content-Type: application/json" \
-    "$@"
+    "$@")
+
+  if ! echo "$response" | jq -e '.success' >/dev/null 2>&1; then
+    local msg
+    msg=$(echo "$response" | jq -r '.errors[0].message // "Unbekannter Fehler"' 2>/dev/null || echo "Ungültige API-Antwort")
+    die "Cloudflare API Fehler: ${msg}"
+  fi
+
+  echo "$response"
 }
 
 # ---------------------------------------------------------------------------
@@ -232,8 +242,10 @@ fi
 # $ zu $$ escapen für Docker Compose
 TRAEFIK_AUTH_ESCAPED=$(echo "$TRAEFIK_AUTH" | sed 's/\$/\$\$/g')
 
-ssh "root@${SERVER_IP}" "cat > /opt/homelab-repo/hetzner/.env << 'ENVEOF'
-# Generiert von bootstrap.sh am $(date -u +%Y-%m-%dT%H:%M:%SZ)
+GENERATED_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+cat <<EOF | ssh "root@${SERVER_IP}" "cat > /opt/homelab-repo/hetzner/.env"
+# Generiert von bootstrap.sh am ${GENERATED_DATE}
 DOMAIN=${DOMAIN}
 SUBDOMAIN_PREFIX=${SUBDOMAIN_PREFIX}
 TRAEFIK_DASHBOARD_AUTH=${TRAEFIK_AUTH_ESCAPED}
@@ -243,8 +255,7 @@ TS_AUTHKEY=
 HEALTHCHECKS_SECRET=${HEALTHCHECKS_SECRET}
 HEALTHCHECKS_SMTP_PASSWORD=
 TZ=Europe/Berlin
-ENVEOF
-"
+EOF
 ok ".env generiert."
 
 # ---------------------------------------------------------------------------
@@ -259,9 +270,6 @@ ok "Docker Compose gestartet."
 # 11. HEADSCALE BOOTSTRAP
 # ---------------------------------------------------------------------------
 info "Headscale Bootstrap..."
-
-# Warte kurz damit Container hochfahren
-sleep 10
 
 ssh "root@${SERVER_IP}" "bash /opt/homelab-repo/hetzner/scripts/headscale-setup.sh"
 ok "Headscale Bootstrap abgeschlossen."
