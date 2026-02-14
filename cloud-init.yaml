@@ -90,7 +90,7 @@ runcmd:
   # =========================================================================
   # ABSCHLUSS
   # =========================================================================
-  - echo "Cloud-Init abgeschlossen: $(date)" >> /var/log/cloud-init-complete.log
+  - ['bash', '-c', 'echo "Cloud-Init abgeschlossen: $(date)" >> /var/log/cloud-init-complete.log']
 
 # -----------------------------------------------------------------------------
 # SYSTEM-KONFIGURATION
