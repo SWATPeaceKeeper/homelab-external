@@ -25,12 +25,12 @@ trap 'error "Bootstrap fehlgeschlagen! Prüfe den Zustand oder führe ./teardown
 # KONFIGURATION
 # ---------------------------------------------------------------------------
 SERVER_NAME="homelab-external"
-SERVER_TYPE="cpx22"
+SERVER_TYPE="cx23"
 SERVER_LOCATION="fsn1"
 SERVER_IMAGE="ubuntu-24.04"
 DOMAIN="robinwerner.net"
 SUBDOMAIN_PREFIX="homelab-external"
-REPO_URL="https://github.com/robinwerner/homelab-external.git"
+REPO_URL="https://github.com/SWATPeaceKeeper/homelab-external.git"
 SSH_KEY_NAME="${SERVER_NAME}-key"
 FIREWALL_NAME="${SERVER_NAME}-firewall"
 
