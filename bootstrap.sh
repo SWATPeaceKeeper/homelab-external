@@ -48,7 +48,7 @@ error() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; }
 die()   { error "$*"; exit 1; }
 
 remote() {
-  ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o BatchMode=yes "root@${SERVER_IP}" "$@"
+  ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR "root@${SERVER_IP}" "$@"
 }
 
 cf_api() {
