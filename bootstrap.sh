@@ -36,7 +36,7 @@ SSH_KEY_NAME="${SERVER_NAME}-key"
 FIREWALL_NAME="${SERVER_NAME}-firewall"
 
 # DNS Subdomains die angelegt werden
-SUBDOMAINS=("headscale" "vpn" "uptime" "ntfy" "hc" "traefik" "dockge")
+SUBDOMAINS=("headscale" "uptime" "ntfy" "hc" "traefik" "dockge")
 
 # ---------------------------------------------------------------------------
 # HILFSFUNKTIONEN
