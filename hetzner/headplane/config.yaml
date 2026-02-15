@@ -11,38 +11,27 @@
 # -----------------------------------------------------------------------------
 # HEADSCALE VERBINDUNG
 # -----------------------------------------------------------------------------
-# url: Interne URL zu Headscale (Container-Name funktioniert im Docker-Netzwerk)
-# config_path: Pfad zur Headscale Config (für erweiterte Integration)
-# config_strict: false = toleranter bei Config-Änderungen
-# -----------------------------------------------------------------------------
 headscale:
   url: http://headscale:8080
   config_path: /etc/headscale/config.yaml
-  config_strict: true
+  config_strict: false
 
 # -----------------------------------------------------------------------------
 # SERVER EINSTELLUNGEN
 # -----------------------------------------------------------------------------
-# host: Auf welcher Adresse Headplane lauscht (0.0.0.0 = alle)
-# port: Port für die Web-Oberfläche
+# cookie_secret_path: Pfad zur Datei mit dem Session-Cookie-Secret (32 Zeichen hex)
+#                     Generieren: openssl rand -hex 16 > /path/to/secret
+#                     Gemountet aus /opt/homelab-data/secrets/cookie_secret
 #
-# cookie_secret_path: Pfad zur Datei mit dem Session-Cookie-Secret
-#                     Das Secret MUSS exakt 32 Zeichen lang sein!
-#                     Generieren mit: openssl rand -hex 16 > /path/to/secret
-#
-#                     HINWEIS: Wir nutzen cookie_secret_path statt cookie_secret,
-#                     damit das Secret nicht in Git landet.
-#                     Die Datei wird aus ./data/secrets/cookie_secret gemountet.
-#
-# cookie_secure: true = Cookies nur über HTTPS senden
-#                Da Traefik HTTPS macht, kann das false bleiben
-#                (interne Kommunikation ist HTTP)
+# cookie_secure: true weil Traefik HTTPS terminiert
+# data_path: Persistenter Speicher für Headplane (SQLite DB etc.)
 # -----------------------------------------------------------------------------
 server:
   host: 0.0.0.0
   port: 3000
   cookie_secret_path: /run/secrets/cookie_secret
-  cookie_secure: false
+  cookie_secure: true
+  data_path: /var/lib/headplane
 
 # -----------------------------------------------------------------------------
 # INTEGRATION
@@ -50,11 +39,11 @@ server:
 # Docker Integration erlaubt Headplane, Headscale automatisch neu zu starten
 # wenn Config-Änderungen (ACLs, DNS Records, etc.) gemacht werden.
 #
-# Erfordert: Docker Socket Mount in docker-compose.yml
-#   - /var/run/docker.sock:/var/run/docker.sock:ro
+# socket: MUSS mit unix:// Prefix angegeben werden
+# container_name: Name des Headscale-Containers
 # -----------------------------------------------------------------------------
 integration:
   docker:
     enabled: true
-    socket: /var/run/docker.sock
-    container: headscale
+    socket: "unix:///var/run/docker.sock"
+    container_name: headscale
