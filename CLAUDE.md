@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Self-hosted homelab infrastructure on Hetzner Cloud (~5 EUR/month). Provisioned via shell scripts (`bootstrap.sh` / `teardown.sh`) and Docker Compose. Documentation and comments are in German.
+Self-hosted homelab infrastructure on Hetzner Cloud (CX23, ~5 EUR/month). Provisioned via shell scripts (`bootstrap.sh` / `teardown.sh`) and Docker Compose. Documentation and comments are in German.
 
-**Services:** Headscale (VPN), Headplane (VPN UI), Traefik (reverse proxy + SSL), Uptime Kuma (monitoring), ntfy (push notifications), Healthchecks (cron monitoring), Dockge (Docker Compose UI), Tailscale client, two PostgreSQL databases.
+**Services:** Headscale (VPN), Headplane (VPN UI), Traefik (reverse proxy + SSL), Uptime Kuma (monitoring), ntfy (push notifications), Healthchecks (cron monitoring), Dockge (Docker Compose UI), Tailscale client, two PostgreSQL databases (17-alpine).
 
 ## Architecture
 
 ### Provisioning
 
-- **`bootstrap.sh`** — Creates everything: Hetzner server + firewall + SSH key, Cloudflare DNS records, clones repo, generates `.env`, starts Docker Compose, bootstraps Headscale. Requires `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`.
-- **`teardown.sh`** — Destroys everything: server, firewall, SSH key, DNS records. Requires confirmation.
-- **`cloud-init.yaml`** — Static (no template variables). Base setup only: packages, Docker, UFW, fail2ban, directory structure, acme.json, cookie_secret, swap.
+- **`bootstrap.sh`** — Creates everything: Hetzner server + firewall + SSH key, Cloudflare DNS records, clones repo, generates `.env`, starts Docker Compose, bootstraps Headscale. Requires `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`. Uses `remote()` helper for all SSH commands with explicit `-i "$SSH_KEY_FILE"`.
+- **`teardown.sh`** — Destroys everything: server, firewall, SSH key, DNS records. Requires "yes" confirmation.
+- **`cloud-init.yaml`** — Static (no template variables). Base setup only: packages, Docker, UFW, fail2ban, directory structure, acme.json, cookie_secret, swap. YAML gotcha: shell commands with colons must use list syntax `['bash', '-c', '...']` to avoid YAML parsing errors.
 - No Terraform, no CI/CD, no GitHub Secrets. All provisioning runs locally.
 
 ### Runtime Configuration
@@ -24,7 +24,7 @@ Self-hosted homelab infrastructure on Hetzner Cloud (~5 EUR/month). Provisioned 
 ### Network Architecture
 
 - **`proxy` network**: Services exposed via Traefik (headscale, headplane, uptime-kuma, ntfy, healthchecks, dockge)
-- **`internal` network**: Database containers only (headscale-postgres, healthchecks-postgres)
+- **`internal` network**: Database containers + services that need DB access (headscale-postgres, healthchecks-postgres, headscale, headplane, healthchecks)
 - **host network**: Tailscale client (needs NET_ADMIN)
 - Routing configured via Traefik Docker labels on each service
 
@@ -85,6 +85,10 @@ docker exec -it healthchecks ./manage.py createsuperuser
 - `headscale-setup.sh` is idempotent (safe to run multiple times)
 - Traefik dashboard and Dockge share the same Basic Auth middleware
 - Both PostgreSQL instances share the same `POSTGRES_PASSWORD` env var
+- PostgreSQL volumes mount to `/var/lib/postgresql/data` (not `/var/lib/postgresql`)
+- Headscale ACL SSH rules use `autogroup:member`/`autogroup:tagged` (wildcard `*` not supported)
+- Headscale DERP server needs explicit `private_key_path` in config
+- `bootstrap.sh` uses `remote()` helper with `-i` flag to avoid SSH key ambiguity
 
 ## Repo Structure
 
@@ -92,7 +96,8 @@ docker exec -it healthchecks ./manage.py createsuperuser
 bootstrap.sh          # Provisioning script (local)
 teardown.sh           # Teardown script (local)
 cloud-init.yaml       # Server base setup (static, no templates)
-SETUP.md              # Single setup document
+README.md             # Project overview
+SETUP.md              # Detailed setup guide
 CLAUDE.md             # This file
 hetzner/
   .env.example        # Environment template

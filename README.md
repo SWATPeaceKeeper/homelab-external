@@ -18,7 +18,7 @@ Selbst-gehostete Infrastruktur auf einem Hetzner vServer (~5 EUR/Monat). VPN, Mo
 
 ```
                         ┌─────────────────────────────────────────┐
-                        │           Hetzner vServer (CPX22)       │
+                        │           Hetzner vServer (CX23)        │
                         │                                         │
 Internet ──► Traefik ──►│  headscale    uptime-kuma    ntfy       │
              (443/80)   │  headplane    healthchecks   dockge     │
@@ -70,6 +70,6 @@ hetzner/
 
 | Posten | Monat |
 |--------|-------|
-| Hetzner CPX22 (Falkenstein) | ~5 EUR |
+| Hetzner CX23 (Falkenstein) | ~5 EUR |
 | Cloudflare DNS | kostenlos |
 | Let's Encrypt SSL | kostenlos |

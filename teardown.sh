@@ -40,11 +40,21 @@ error() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; }
 cf_api() {
   local method="$1" endpoint="$2"
   shift 2
-  curl -s -X "$method" \
+  local response
+  response=$(curl -s -X "$method" \
     "https://api.cloudflare.com/client/v4${endpoint}" \
     -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
     -H "Content-Type: application/json" \
-    "$@"
+    "$@")
+
+  if ! echo "$response" | jq -e '.success' >/dev/null 2>&1; then
+    local msg
+    msg=$(echo "$response" | jq -r '.errors[0].message // "Unbekannter Fehler"' 2>/dev/null || echo "Ungültige API-Antwort")
+    error "Cloudflare API Fehler: ${msg}"
+    return 1
+  fi
+
+  echo "$response"
 }
 
 # ---------------------------------------------------------------------------

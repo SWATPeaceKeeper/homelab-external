@@ -13,6 +13,7 @@
 # Voraussetzungen:
 #   - hcloud, curl, jq, openssl installiert
 #   - HCLOUD_TOKEN, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID gesetzt
+#   - SSH Key unter ~/.ssh/id_ed25519 (oder id_rsa)
 #
 # Verwendung:
 #   export HCLOUD_TOKEN=... CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ZONE_ID=...
@@ -46,6 +47,10 @@ warn()  { echo -e "\033[1;33m[WARN]\033[0m  $*"; }
 error() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; }
 die()   { error "$*"; exit 1; }
 
+remote() {
+  ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o BatchMode=yes "root@${SERVER_IP}" "$@"
+}
+
 cf_api() {
   local method="$1" endpoint="$2"
   shift 2
@@ -78,26 +83,26 @@ done
 [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && die "CLOUDFLARE_API_TOKEN ist nicht gesetzt."
 [ -z "${CLOUDFLARE_ZONE_ID:-}" ] && die "CLOUDFLARE_ZONE_ID ist nicht gesetzt."
 
+# SSH Key finden (Public + Private)
+SSH_KEY_FILE=""
+for f in ~/.ssh/id_ed25519 ~/.ssh/id_rsa; do
+  if [ -f "$f" ] && [ -f "${f}.pub" ]; then
+    SSH_KEY_FILE="$f"
+    break
+  fi
+done
+[ -z "$SSH_KEY_FILE" ] && die "Kein SSH Key gefunden (~/.ssh/id_ed25519 oder id_rsa)."
+
+SSH_PUBKEY=$(cat "${SSH_KEY_FILE}.pub")
+info "SSH Key: ${SSH_KEY_FILE}"
+
 ok "Alle Voraussetzungen erfüllt."
 
 # ---------------------------------------------------------------------------
 # 2. SSH KEY
 # ---------------------------------------------------------------------------
-info "SSH Key..."
+info "SSH Key bei Hetzner..."
 
-# Lokalen SSH Key finden
-SSH_PUBKEY_FILE=""
-for f in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
-  if [ -f "$f" ]; then
-    SSH_PUBKEY_FILE="$f"
-    break
-  fi
-done
-[ -z "$SSH_PUBKEY_FILE" ] && die "Kein SSH Public Key gefunden (~/.ssh/id_ed25519.pub oder id_rsa.pub)."
-
-SSH_PUBKEY=$(cat "$SSH_PUBKEY_FILE")
-
-# Key bei Hetzner hochladen (oder existierenden finden)
 if hcloud ssh-key describe "$SSH_KEY_NAME" >/dev/null 2>&1; then
   ok "SSH Key '${SSH_KEY_NAME}' existiert bereits."
 else
@@ -115,7 +120,6 @@ if hcloud firewall describe "$FIREWALL_NAME" >/dev/null 2>&1; then
 else
   hcloud firewall create --name "$FIREWALL_NAME"
 
-  # Regeln hinzufügen
   hcloud firewall add-rule "$FIREWALL_NAME" --direction in --protocol tcp --port 22 --source-ips 0.0.0.0/0 --source-ips ::/0 --description "SSH"
   hcloud firewall add-rule "$FIREWALL_NAME" --direction in --protocol tcp --port 80 --source-ips 0.0.0.0/0 --source-ips ::/0 --description "HTTP"
   hcloud firewall add-rule "$FIREWALL_NAME" --direction in --protocol tcp --port 443 --source-ips 0.0.0.0/0 --source-ips ::/0 --description "HTTPS"
@@ -159,11 +163,9 @@ info "DNS Records..."
 for sub in "${SUBDOMAINS[@]}"; do
   FQDN="${sub}.${SUBDOMAIN_PREFIX}.${DOMAIN}"
 
-  # Prüfe ob Record existiert
   EXISTING=$(cf_api GET "/zones/${CLOUDFLARE_ZONE_ID}/dns_records?type=A&name=${FQDN}" | jq -r '.result | length')
 
   if [ "$EXISTING" -gt "0" ]; then
-    # Record updaten
     RECORD_ID=$(cf_api GET "/zones/${CLOUDFLARE_ZONE_ID}/dns_records?type=A&name=${FQDN}" | jq -r '.result[0].id')
     cf_api PUT "/zones/${CLOUDFLARE_ZONE_ID}/dns_records/${RECORD_ID}" \
       -d "{\"type\":\"A\",\"name\":\"${sub}.${SUBDOMAIN_PREFIX}\",\"content\":\"${SERVER_IP}\",\"ttl\":300,\"proxied\":false}" >/dev/null
@@ -181,7 +183,7 @@ done
 info "Warte auf SSH-Bereitschaft..."
 
 for i in $(seq 1 60); do
-  if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o BatchMode=yes "root@${SERVER_IP}" true 2>/dev/null; then
+  if remote true 2>/dev/null; then
     ok "SSH bereit."
     break
   fi
@@ -194,25 +196,30 @@ done
 # ---------------------------------------------------------------------------
 # 7. WARTE AUF CLOUD-INIT
 # ---------------------------------------------------------------------------
-info "Warte auf Cloud-Init-Abschluss..."
+info "Warte auf Cloud-Init-Abschluss (kann 3-5 Minuten dauern)..."
 
-for i in $(seq 1 60); do
-  if ssh -o BatchMode=yes "root@${SERVER_IP}" "cloud-init status --wait" 2>/dev/null | grep -q "done"; then
-    ok "Cloud-Init abgeschlossen."
-    break
-  fi
-  if [ "$i" -eq 60 ]; then
-    die "Cloud-Init nicht abgeschlossen nach 5 Minuten."
-  fi
-  sleep 5
-done
+CLOUD_INIT_STATUS=$(remote "cloud-init status --wait 2>/dev/null" || true)
+
+if echo "$CLOUD_INIT_STATUS" | grep -q "status: error"; then
+  warn "Cloud-Init hatte Fehler. Prüfe: ssh -i ${SSH_KEY_FILE} root@${SERVER_IP} 'cloud-init status --long'"
+  die "Cloud-Init fehlgeschlagen."
+elif echo "$CLOUD_INIT_STATUS" | grep -q "status: done"; then
+  ok "Cloud-Init abgeschlossen."
+else
+  warn "Cloud-Init Status unklar: ${CLOUD_INIT_STATUS}"
+  ok "Fahre fort..."
+fi
+
+# Prüfe ob Docker installiert wurde
+remote "docker --version >/dev/null 2>&1" || die "Docker wurde nicht installiert. Cloud-Init war fehlerhaft."
+ok "Docker ist installiert."
 
 # ---------------------------------------------------------------------------
 # 8. REPO KLONEN
 # ---------------------------------------------------------------------------
 info "Klone Repository..."
 
-ssh "root@${SERVER_IP}" "
+remote "
   if [ -d /opt/homelab-repo/.git ]; then
     cd /opt/homelab-repo && git pull
   else
@@ -231,12 +238,11 @@ POSTGRES_PASSWORD=$(openssl rand -hex 16)
 HEALTHCHECKS_SECRET=$(openssl rand -hex 25)
 TRAEFIK_PASSWORD=$(openssl rand -base64 12)
 
-# htpasswd generieren (lokal, braucht htpasswd oder openssl)
+# htpasswd generieren
 if command -v htpasswd >/dev/null 2>&1; then
   TRAEFIK_AUTH=$(htpasswd -nb admin "$TRAEFIK_PASSWORD")
 else
-  # Fallback: auf dem Server generieren (apache2-utils via cloud-init installiert)
-  TRAEFIK_AUTH=$(ssh "root@${SERVER_IP}" "htpasswd -nb admin '${TRAEFIK_PASSWORD}'")
+  TRAEFIK_AUTH=$(remote "htpasswd -nb admin '${TRAEFIK_PASSWORD}'")
 fi
 
 # $ zu $$ escapen für Docker Compose
@@ -244,7 +250,7 @@ TRAEFIK_AUTH_ESCAPED=$(echo "$TRAEFIK_AUTH" | sed 's/\$/\$\$/g')
 
 GENERATED_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-cat <<EOF | ssh "root@${SERVER_IP}" "cat > /opt/homelab-repo/hetzner/.env"
+cat <<EOF | remote "cat > /opt/homelab-repo/hetzner/.env"
 # Generiert von bootstrap.sh am ${GENERATED_DATE}
 DOMAIN=${DOMAIN}
 SUBDOMAIN_PREFIX=${SUBDOMAIN_PREFIX}
@@ -263,7 +269,7 @@ ok ".env generiert."
 # ---------------------------------------------------------------------------
 info "Starte Docker Compose..."
 
-ssh "root@${SERVER_IP}" "cd /opt/homelab-repo/hetzner && docker compose up -d"
+remote "cd /opt/homelab-repo/hetzner && docker compose up -d"
 ok "Docker Compose gestartet."
 
 # ---------------------------------------------------------------------------
@@ -271,7 +277,7 @@ ok "Docker Compose gestartet."
 # ---------------------------------------------------------------------------
 info "Headscale Bootstrap..."
 
-ssh "root@${SERVER_IP}" "bash /opt/homelab-repo/hetzner/scripts/headscale-setup.sh"
+remote "bash /opt/homelab-repo/hetzner/scripts/headscale-setup.sh"
 ok "Headscale Bootstrap abgeschlossen."
 
 # ---------------------------------------------------------------------------
@@ -283,19 +289,19 @@ echo "  HOMELAB EXTERNAL - SETUP ABGESCHLOSSEN"
 echo "============================================================================"
 echo ""
 echo "  Server IP:  ${SERVER_IP}"
-echo "  SSH:        ssh root@${SERVER_IP}"
+echo "  SSH:        ssh -i ${SSH_KEY_FILE} root@${SERVER_IP}"
 echo ""
 echo "  URLs:"
 for sub in "${SUBDOMAINS[@]}"; do
   printf "    %-12s https://%s.%s.%s\n" "${sub}:" "${sub}" "${SUBDOMAIN_PREFIX}" "${DOMAIN}"
 done
 echo ""
-echo "  Traefik Dashboard:"
+echo "  Traefik + Dockge (Basic Auth):"
 echo "    User:     admin"
 echo "    Passwort: ${TRAEFIK_PASSWORD}"
 echo ""
 echo "  Verbleibende manuelle Schritte:"
-echo "    1. ntfy Admin:        ssh root@${SERVER_IP} 'docker exec -it ntfy ntfy user add --role=admin admin'"
-echo "    2. Healthchecks Admin: ssh root@${SERVER_IP} 'docker exec -it healthchecks ./manage.py createsuperuser'"
+echo "    1. ntfy Admin:        ssh -i ${SSH_KEY_FILE} root@${SERVER_IP} 'docker exec -it ntfy ntfy user add --role=admin admin'"
+echo "    2. Healthchecks Admin: ssh -i ${SSH_KEY_FILE} root@${SERVER_IP} 'docker exec -it healthchecks ./manage.py createsuperuser --email admin@robinwerner.net --password DEIN_PASSWORT'"
 echo ""
 echo "============================================================================"

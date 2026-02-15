@@ -79,15 +79,16 @@ Dauer: ca. 3-5 Minuten.
 
 ### 3. Manuelle Schritte (nach bootstrap.sh)
 
+Die SSH-Verbindung und das Traefik-Dashboard-Passwort werden am Ende von `bootstrap.sh` ausgegeben.
+
 ```bash
 # ntfy Admin-User erstellen
-ssh root@<SERVER_IP> 'docker exec -it ntfy ntfy user add --role=admin admin'
+ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> 'docker exec -it ntfy ntfy user add --role=admin admin'
 
-# Healthchecks Superuser erstellen
-ssh root@<SERVER_IP> 'docker exec -it healthchecks ./manage.py createsuperuser'
+# Healthchecks Superuser erstellen (non-interaktiv)
+ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> 'docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@robinwerner.net'
+ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> 'docker exec healthchecks ./manage.py shell -c "from django.contrib.auth.models import User; u=User.objects.get(email=\"admin@robinwerner.net\"); u.set_password(\"DEIN_PASSWORT\"); u.save()"'
 ```
-
-Das Traefik-Dashboard-Passwort wird am Ende von `bootstrap.sh` ausgegeben.
 
 ---
 
@@ -106,7 +107,7 @@ Löscht: Server, Firewall, SSH Key, alle DNS Records. Fragt vorher "yes" als Bes
 ### SSH zum Server
 
 ```bash
-ssh root@<SERVER_IP>
+ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP>
 ```
 
 ### Docker Compose
@@ -182,5 +183,5 @@ docker compose logs headscale
 
 | Posten | Kosten/Monat |
 |--------|--------------|
-| Hetzner CPX22 (Falkenstein) | ~5 EUR |
+| Hetzner CX23 (Falkenstein) | ~5 EUR |
 | **Gesamt** | **~5 EUR** |
