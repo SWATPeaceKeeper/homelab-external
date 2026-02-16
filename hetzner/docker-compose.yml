@@ -151,7 +151,7 @@ services:
   # Dann in .env eintragen: HEADSCALE_API_KEY=...
   # =========================================================================
   headplane:
-    image: ghcr.io/tale/headplane:latest
+    image: ghcr.io/tale/headplane:0.6.2-beta.5
     container_name: headplane
     restart: unless-stopped
     volumes:
@@ -165,9 +165,12 @@ services:
       - /opt/homelab-data/secrets/cookie_secret:/run/secrets/cookie_secret:ro
     depends_on:
       - headscale
-    # Kein Healthcheck: Headplane v0.6.1 nutzt distroless Image ohne Binaries
     healthcheck:
-      disable: true
+      test: ["CMD", "/usr/bin/hp_healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     networks:
       - proxy
       - internal
