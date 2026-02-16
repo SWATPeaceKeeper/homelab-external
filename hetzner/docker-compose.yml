@@ -165,12 +165,9 @@ services:
       - /opt/homelab-data/secrets/cookie_secret:/run/secrets/cookie_secret:ro
     depends_on:
       - headscale
+    # Kein Healthcheck: Headplane v0.6.1 nutzt distroless Image ohne Binaries
     healthcheck:
-      test: ["CMD", "/bin/hp_healthcheck"]
-      interval: 30s
-      timeout: 5s
-      start_period: 5s
-      retries: 3
+      disable: true
     networks:
       - proxy
       - internal
