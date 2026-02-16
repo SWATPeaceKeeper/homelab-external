@@ -6,20 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Self-hosted homelab infrastructure on Hetzner Cloud (CX23, ~5 EUR/month). Provisioned via shell scripts (`bootstrap.sh` / `teardown.sh`) and Docker Compose. Documentation and comments are in German.
 
-**Services:** Headscale (VPN), Headplane (VPN UI), Traefik (reverse proxy + SSL), Uptime Kuma (monitoring), ntfy (push notifications), Healthchecks (cron monitoring), Dockge (Docker Compose UI), Tailscale client, two PostgreSQL databases (17-alpine).
+**Services:** Headscale v0.28 (VPN), Headplane v0.6.2-beta.5 (VPN UI), Traefik v3.6 (reverse proxy + SSL), Uptime Kuma (monitoring), ntfy (push notifications), Healthchecks (cron monitoring), Dockge (Docker Compose UI), Tailscale client, two PostgreSQL 17-alpine databases.
 
 ## Architecture
 
 ### Provisioning
 
-- **`bootstrap.sh`** — Creates everything: Hetzner server + firewall + SSH key, Cloudflare DNS records, clones repo, generates `.env`, starts Docker Compose, bootstraps Headscale. Requires `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`. Uses `remote()` helper for all SSH commands with explicit `-i "$SSH_KEY_FILE"`.
+- **`bootstrap.sh`** — Creates everything: Hetzner server + firewall + SSH key, Cloudflare DNS records, clones repo, generates `.env`, starts Docker Compose, bootstraps Headscale. Requires `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`. Uses `remote()` helper with `-i "$SSH_KEY_FILE"` and `UserKnownHostsFile=/dev/null` for all SSH commands.
 - **`teardown.sh`** — Destroys everything: server, firewall, SSH key, DNS records. Requires "yes" confirmation.
 - **`cloud-init.yaml`** — Static (no template variables). Base setup only: packages, Docker, UFW, fail2ban, directory structure, acme.json, cookie_secret, swap. YAML gotcha: shell commands with colons must use list syntax `['bash', '-c', '...']` to avoid YAML parsing errors.
 - No Terraform, no CI/CD, no GitHub Secrets. All provisioning runs locally.
 
 ### Runtime Configuration
 
-- **`hetzner/`** — Deployed to `/opt/homelab-repo/hetzner/` on the server. Docker Compose orchestrates all services. Config changes deployed manually (git pull on server).
+- **`hetzner/`** — Deployed to `/opt/homelab-repo/hetzner/` on the server. Docker Compose orchestrates all services. Config changes deployed manually (`git pull` on server, then `docker compose up -d`).
 
 ### Network Architecture
 
@@ -72,23 +72,32 @@ docker exec headscale headscale preauthkeys create --user homelab --expiration 2
 # ntfy admin user
 docker exec -it ntfy ntfy user add --role=admin admin
 
-# Healthchecks superuser
-docker exec -it healthchecks ./manage.py createsuperuser
+# Healthchecks superuser (set password via Web UI afterwards)
+docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@example.com
 ```
 
 ## Key Design Decisions
 
 - No Terraform/CI/CD — shell scripts for simplicity, repo is public
 - Cloudflare DNS records are `proxied = false` — required for Headscale DERP and WebSocket services
-- Only IPv4 A-Records (no AAAA)
+- Only IPv4 A-Records (no AAAA), 6 subdomains: headscale, uptime, ntfy, hc, traefik, dockge
 - Cloud-Init does base setup only. Repo clone, .env, docker compose are done by `bootstrap.sh` via SSH
 - `headscale-setup.sh` is idempotent (safe to run multiple times)
 - Traefik dashboard and Dockge share the same Basic Auth middleware
 - Both PostgreSQL instances share the same `POSTGRES_PASSWORD` env var
 - PostgreSQL volumes mount to `/var/lib/postgresql/data` (not `/var/lib/postgresql`)
-- Headscale ACL SSH rules use `autogroup:member`/`autogroup:tagged` (wildcard `*` not supported)
+- Headscale ACL SSH rules use `autogroup:member`/`autogroup:tagged` (wildcard `*` not supported in v0.28)
 - Headscale DERP server needs explicit `private_key_path` in config
-- `bootstrap.sh` uses `remote()` helper with `-i` flag to avoid SSH key ambiguity
+- Headscale postgres `ssl: false` (not `disable` — Headplane validator rejects `disable`)
+
+## Known Pitfalls
+
+- **Headplane version**: Must match Headscale version. v0.6.1 does NOT work with Headscale v0.28. Use v0.6.2-beta.5+.
+- **Headplane healthcheck**: Binary at `/bin/hp_healthcheck`. Unhealthy containers are invisible to Traefik (no routing).
+- **Headplane Docker socket**: Config requires `unix:///var/run/docker.sock` prefix (not just the path).
+- **Headplane Traefik routing**: Needs explicit `priority=200` so `/admin` paths go to Headplane, not the Headscale catch-all router.
+- **SSH known_hosts**: `bootstrap.sh` uses `UserKnownHostsFile=/dev/null` because server IPs get reused after teardown/rebuild.
+- **Cloud-init YAML**: Colons in shell commands break YAML parsing. Use list syntax: `['bash', '-c', 'echo "done: $(date)"']`.
 
 ## Repo Structure
 
@@ -109,7 +118,7 @@ hetzner/
   headscale/
     acl.json
     config.yaml
-    dns_records.json
+    dns_records.json  # Extra DNS records (empty template)
   traefik/
     traefik.yml
 ```

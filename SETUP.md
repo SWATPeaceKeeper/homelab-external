@@ -85,9 +85,16 @@ Die SSH-Verbindung und das Traefik-Dashboard-Passwort werden am Ende von `bootst
 # ntfy Admin-User erstellen
 ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> 'docker exec -it ntfy ntfy user add --role=admin admin'
 
-# Healthchecks Superuser erstellen (non-interaktiv)
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> 'docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@robinwerner.net'
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> 'docker exec healthchecks ./manage.py shell -c "from django.contrib.auth.models import User; u=User.objects.get(email=\"admin@robinwerner.net\"); u.set_password(\"DEIN_PASSWORT\"); u.save()"'
+# Healthchecks Superuser erstellen
+ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> 'docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@example.com'
+# Danach Passwort über die Web-Oberfläche zurücksetzen (Forgot Password)
+# oder via Django Shell:
+ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> 'docker exec healthchecks ./manage.py shell -c "
+from django.contrib.auth.models import User
+u = User.objects.first()
+u.set_password(\"DEIN_PASSWORT\")
+u.save()
+"'
 ```
 
 ---
