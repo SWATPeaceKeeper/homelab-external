@@ -177,8 +177,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.headplane.rule=Host(`headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.headplane.entrypoints=websecure"
       - "traefik.http.routers.headplane.tls=true"
       - "traefik.http.routers.headplane.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.headplane.priority=200"
       - "traefik.http.services.headplane.loadbalancer.server.port=3000"
 
   # =========================================================================
