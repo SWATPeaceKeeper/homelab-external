@@ -255,7 +255,7 @@ services:
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
-      - TS_EXTRA_ARGS=--login-server=https://headscale.${SUBDOMAIN_PREFIX}.${DOMAIN} --accept-routes
+      - TS_EXTRA_ARGS=--login-server=https://headscale.${SUBDOMAIN_PREFIX}.${DOMAIN} --accept-routes --accept-dns=false
       # Pre-Auth Key (nach Headscale-Setup eintragen)
       - TS_AUTHKEY=${TS_AUTHKEY:-}
     network_mode: host
@@ -286,6 +286,9 @@ services:
       - FOWNER
       - SETGID
       - SETUID
+    dns:
+      - 10.10.10.3
+      - 1.1.1.1
     volumes:
       - /opt/homelab-data/uptime-kuma:/app/data
     healthcheck:
@@ -322,6 +325,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    dns:
+      - 10.10.10.3
+      - 1.1.1.1
     command: serve
     environment:
       - TZ=${TZ:-Europe/Berlin}
@@ -366,6 +372,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    dns:
+      - 10.10.10.3
+      - 1.1.1.1
     environment:
       - ALLOWED_HOSTS=hc.${SUBDOMAIN_PREFIX}.${DOMAIN}
       - APPRISE_ENABLED=True
