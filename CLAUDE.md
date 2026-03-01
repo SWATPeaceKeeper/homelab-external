@@ -108,6 +108,9 @@ docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@exa
   - Tailscale: `NET_ADMIN, SYS_MODULE` (VPN networking)
 - **Healthchecks image**: No `curl`/`wget` available. Healthcheck uses Python `urllib` with Host header from `ALLOWED_HOSTS` env var (Django rejects `localhost` requests).
 - **Uptime Kuma v2.x healthcheck**: Use `/api/entry-page` endpoint (not `/api/status-page/heartbeat` which returns 404).
+- **Tailscale Docker networking**: Must set `TS_USERSPACE=false` for kernel networking mode. Default is userspace, which doesn't create kernel routes — other containers can't reach VPN subnets.
+- **Tailscale subnet routing**: Hetzner Tailscale client needs `--accept-routes` to use subnet routes from the NUC. Without it, only `tailscale ping` works but no regular IP traffic.
+- **SSH key**: Located at `~/.ssh/homelab-external` (not `~/.ssh/id_ed25519`). Use with `-i ~/.ssh/homelab-external`.
 - **SSH known_hosts**: `bootstrap.sh` uses `UserKnownHostsFile=/dev/null` because server IPs get reused after teardown/rebuild.
 - **Cloud-init YAML**: Colons in shell commands break YAML parsing. Use list syntax: `['bash', '-c', 'echo "done: $(date)"']`.
 
