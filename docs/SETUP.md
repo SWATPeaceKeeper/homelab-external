@@ -95,11 +95,35 @@ Das Script macht automatisch:
 - 5 DNS A-Records bei Cloudflare anlegen
 - Repo klonen und `.env` generieren
 - `docker compose up -d`
-- Headscale User + API Key erstellen
+- Headscale User `homelab` (Infrastruktur) + API Key erstellen
 
 Dauer: ca. 3-5 Minuten.
 
-### 3. Manuelle Schritte nach Bootstrap
+### 3. Headscale User anlegen
+
+`bootstrap.sh` erstellt automatisch den User `homelab` für Infrastruktur-Geräte.
+Für persönliche Endgeräte einen separaten User anlegen:
+
+```bash
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
+  'docker exec headscale headscale users create robin'
+```
+
+**User-Konzept:**
+
+| User | Zweck | Geräte | ACL-Referenz |
+|------|-------|--------|--------------|
+| `homelab` | Infrastruktur | NUC, Hetzner Server (getaggt) | `homelab@` |
+| `robin` | Persönliche Geräte | iPhone, Mac, ... | `robin@` |
+
+Ungetaggte Geräte beider User landen in `autogroup:member` und haben vollen
+VPN-Zugriff. Getaggte Geräte (z.B. Hetzner Server mit `tag:server`) bekommen
+nur die Rechte, die ihre Tags in der ACL definieren.
+
+> **Hinweis**: Weitere User (z.B. `partner`, `gast`) können später angelegt
+> werden, um den Zugriff pro Person einzuschränken.
+
+### 4. Manuelle Schritte nach Bootstrap
 
 Die SSH-Verbindung und das Traefik-Dashboard-Passwort werden am Ende
 von `bootstrap.sh` ausgegeben.
@@ -130,7 +154,7 @@ ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec headscale headscale nodes tag --identifier <ID> --tags tag:server'
 ```
 
-### 4. Services prüfen
+### 5. Services prüfen
 
 | Dienst | URL |
 |--------|-----|
@@ -311,9 +335,9 @@ läuft mit `--accept-dns=false` und nutzt weiterhin seinen eigenen DNS.
 # Tailscale installieren
 brew install tailscale
 
-# Pre-Auth Key erstellen (auf dem Hetzner Server)
+# Pre-Auth Key erstellen (User robin für persönliche Geräte)
 ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
-  'docker exec headscale headscale preauthkeys create --user homelab --expiration 24h'
+  'docker exec headscale headscale preauthkeys create --user robin --expiration 24h'
 
 # Mit Headscale verbinden
 tailscale up \
@@ -346,7 +370,7 @@ tailscale set --exit-node=
 
 ```bash
 ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
-  'docker exec headscale headscale nodes register --user homelab --key mkey:<KEY_VON_DER_SEITE>'
+  'docker exec headscale headscale nodes register --user robin --key mkey:<KEY_VON_DER_SEITE>'
 ```
 
 6. In der Tailscale App: **Exit Node** → `nuc-homelab` auswählen
