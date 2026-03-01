@@ -25,7 +25,7 @@
 
   // HOSTS (Aliase)
   "hosts": {
-    "homelab-network": "10.0.0.0/24"
+    "homelab-network": "10.10.10.0/24"
   },
 
   // ACL REGELN
