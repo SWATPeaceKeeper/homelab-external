@@ -298,7 +298,7 @@ done
 echo ""
 echo "  Traefik Dashboard (Basic Auth):"
 echo "    User:     admin"
-echo "    Passwort: ${TRAEFIK_PASSWORD}"
+echo "    Passwort: siehe /opt/homelab-repo/hetzner/.env (TRAEFIK_DASHBOARD_AUTH)"
 echo ""
 echo "  Verbleibende manuelle Schritte:"
 echo "    1. ntfy Admin:        ssh -i ${SSH_KEY_FILE} root@${SERVER_IP} 'docker exec -it ntfy ntfy user add --role=admin admin'"

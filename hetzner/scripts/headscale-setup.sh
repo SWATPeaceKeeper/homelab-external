@@ -75,4 +75,4 @@ fi
 echo ""
 echo "=== Headscale Setup abgeschlossen ==="
 echo "User:    ${USER}"
-echo "API Key: $(grep '^HEADSCALE_API_KEY=' "$ENV_FILE" | cut -d= -f2)"
+echo "API Key: gesetzt in ${ENV_FILE}"
