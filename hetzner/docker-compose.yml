@@ -124,6 +124,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     command: serve
     depends_on:
       headscale-postgres:
@@ -274,6 +279,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     volumes:
       - /opt/homelab-data/uptime-kuma:/app/data
     healthcheck:
