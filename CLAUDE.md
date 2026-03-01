@@ -110,6 +110,9 @@ docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@exa
 - **Uptime Kuma v2.x healthcheck**: Use `/api/entry-page` endpoint (not `/api/status-page/heartbeat` which returns 404).
 - **Tailscale Docker networking**: Must set `TS_USERSPACE=false` for kernel networking mode. Default is userspace, which doesn't create kernel routes — other containers can't reach VPN subnets.
 - **Tailscale subnet routing**: Hetzner Tailscale client needs `--accept-routes` to use subnet routes from the NUC. Without it, only `tailscale ping` works but no regular IP traffic.
+- **Tailscale DNS (`--accept-dns`)**: The Hetzner Tailscale client uses `--accept-dns=false`. This setting persists in Tailscale state — removing the flag from `TS_EXTRA_ARGS` does NOT reset it, you must explicitly run `tailscale set --accept-dns=false`. Also: Tailscale in Docker with `network_mode: host` cannot configure systemd-resolved (no D-Bus access), so `--accept-dns=true` has no effect on host DNS.
+- **Monitoring DNS for home network**: Uptime Kuma, Healthchecks, and ntfy use `dns: [10.10.10.3, 1.1.1.1]` in docker-compose.yml to resolve home network hostnames (e.g. `z2m.home.robinwerner.net`). Pi-hole (10.10.10.3) as primary, Cloudflare as fallback. Requires port 53 in ACL for `tag:server` → `homelab-network`.
+- **Headscale ACL port 53**: The ACL must include `homelab-network:53` for `tag:server` so DNS queries from monitoring containers can reach Pi-hole via VPN.
 - **SSH key**: Located at `~/.ssh/homelab-external` (not `~/.ssh/id_ed25519`). Use with `-i ~/.ssh/homelab-external`.
 - **SSH known_hosts**: `bootstrap.sh` uses `UserKnownHostsFile=/dev/null` because server IPs get reused after teardown/rebuild.
 - **Cloud-init YAML**: Colons in shell commands break YAML parsing. Use list syntax: `['bash', '-c', 'echo "done: $(date)"']`.
