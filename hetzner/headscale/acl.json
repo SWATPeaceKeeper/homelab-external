@@ -51,6 +51,7 @@
       "action": "accept",
       "src": ["tag:server"],
       "dst": [
+        "homelab-network:53",
         "homelab-network:80",
         "homelab-network:443",
         "homelab-network:3000",
