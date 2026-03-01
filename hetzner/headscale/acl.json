@@ -3,24 +3,16 @@
 // ==========================================================================
 // Dokumentation: https://headscale.net/stable/ref/acls/
 // Format: HuJSON (JSON mit Kommentaren)
+// Policy v2 (ab Headscale v0.26+): User-Referenzen mit @ am Ende
 //
 // Nach Änderungen: docker compose restart headscale
 // ==========================================================================
 
 {
-  // GRUPPEN
-  "groups": {
-    "group:admin": [
-      "robin@homelab"
-    ],
-    "group:server": [
-      "hetzner-server@homelab"
-    ]
-  },
-
   // TAG OWNERS
+  // Nur User "homelab" darf tag:server vergeben
   "tagOwners": {
-    "tag:server": ["group:admin"]
+    "tag:server": ["homelab@"]
   },
 
   // HOSTS (Aliase)
@@ -28,19 +20,35 @@
     "homelab-network": "10.10.10.0/24"
   },
 
+  // AUTO-APPROVAL
+  // Routen und Exit Nodes werden automatisch freigegeben
+  "autoApprovers": {
+    "routes": {
+      "10.10.10.0/24": ["homelab@"]
+    },
+    "exitNode": ["homelab@"]
+  },
+
   // ACL REGELN
   "acls": [
-    // Admins: voller Zugriff
+    // Persönliche Geräte (untagged): voller VPN-Zugriff
     {
       "action": "accept",
-      "src": ["group:admin"],
+      "src": ["autogroup:member"],
       "dst": ["*:*"]
     },
 
-    // Hetzner-Server: Monitoring-Zugriff auf Homelab
+    // Persönliche Geräte: Internet über Exit Node
     {
       "action": "accept",
-      "src": ["group:server"],
+      "src": ["autogroup:member"],
+      "dst": ["autogroup:internet:*"]
+    },
+
+    // Hetzner-Server (tag:server): Monitoring-Zugriff auf Homelab
+    {
+      "action": "accept",
+      "src": ["tag:server"],
       "dst": [
         "homelab-network:80",
         "homelab-network:443",
@@ -65,7 +73,7 @@
   "ssh": [
     {
       "action": "accept",
-      "src": ["group:admin"],
+      "src": ["autogroup:member"],
       "dst": ["autogroup:member", "autogroup:tagged"],
       "users": ["autogroup:nonroot", "root"]
     }

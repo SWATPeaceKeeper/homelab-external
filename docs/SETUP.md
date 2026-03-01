@@ -121,6 +121,13 @@ u = User.objects.first()
 u.set_password(\"DEIN_PASSWORT\")
 u.save()
 "'
+
+# Hetzner-Server Node mit tag:server taggen (für ACL)
+ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+  'docker exec headscale headscale nodes list'
+# Node-ID des Hetzner-Servers (hostname: hetzner-server) notieren, dann:
+ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+  'docker exec headscale headscale nodes tag --identifier <ID> --tags tag:server'
 ```
 
 ### 4. Services prüfen
@@ -216,28 +223,38 @@ docker compose up -d
 docker exec tailscale tailscale status
 ```
 
-### 4. Routen und Exit Node in Headscale freigeben
+### 4. Routen und Exit Node prüfen
 
-Der NUC hat seine Subnet Route und Exit Node angekündigt, aber Headscale
-muss diese noch freigeben:
+Die ACL enthält `autoApprovers` — Subnet Routes und Exit Nodes werden
+automatisch freigegeben, sobald ein Node sie ankündigt. Manuelle
+Freigabe ist nicht nötig.
+
+Prüfen ob die Routen aktiv sind:
 
 ```bash
 # Auf dem Hetzner Server
 ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP>
 
 # Alle Routen anzeigen
-docker exec headscale headscale routes list
+docker exec headscale headscale nodes list-routes
 
-# Subnet Route freigeben (10.10.10.0/24)
-docker exec headscale headscale routes enable -r <ROUTE_ID>
-
-# Exit Node freigeben (0.0.0.0/0 und ::/0)
-docker exec headscale headscale routes enable -r <EXIT_NODE_ROUTE_ID_V4>
-docker exec headscale headscale routes enable -r <EXIT_NODE_ROUTE_ID_V6>
+# Erwartete Routen (alle "available" und "approved"):
+# - 10.10.10.0/24  (Subnet Route)
+# - 0.0.0.0/0      (Exit Node IPv4)
+# - ::/0            (Exit Node IPv6)
 ```
 
-`headscale routes list` zeigt alle verfügbaren Routen mit IDs.
-Die Subnet Route ist `10.10.10.0/24`, die Exit Node Routen sind `0.0.0.0/0` und `::/0`.
+Falls Routen nicht automatisch freigegeben werden, manuell genehmigen:
+
+```bash
+# Node-ID des NUC ermitteln
+docker exec headscale headscale nodes list
+
+# Routen manuell freigeben
+docker exec headscale headscale nodes approve-routes \
+  --identifier <NUC_NODE_ID> \
+  --routes 10.10.10.0/24,0.0.0.0/0,::/0
+```
 
 ### 5. DNS auf Pi-hole umstellen
 
@@ -366,7 +383,7 @@ bash /opt/homelab-repo/hetzner/scripts/auto-update.sh
 docker exec headscale headscale users list
 docker exec headscale headscale nodes list
 docker exec headscale headscale preauthkeys create --user homelab --expiration 24h
-docker exec headscale headscale routes list
+docker exec headscale headscale nodes list-routes
 ```
 
 ---
@@ -413,9 +430,9 @@ docker exec tailscale tailscale status
 
 # Headscale Nodes und Routen prüfen (auf Hetzner)
 docker exec headscale headscale nodes list
-docker exec headscale headscale routes list
+docker exec headscale headscale nodes list-routes
 
-# Alle Routen enabled? Subnet Route und Exit Node müssen "enabled" sein
+# Routen müssen "available" und "approved" sein
 ```
 
 ### Heimnetz-Geräte nicht erreichbar (trotz VPN)
@@ -426,8 +443,8 @@ sysctl net.ipv4.ip_forward
 # Muss 1 sein
 
 # Subnet Route in Headscale freigegeben?
-docker exec headscale headscale routes list
-# 10.10.10.0/24 muss "enabled" sein
+docker exec headscale headscale nodes list-routes
+# 10.10.10.0/24 muss "approved" sein
 
 # Ping vom Hetzner Server ins Heimnetz
 docker exec tailscale tailscale ping 10.10.10.1
@@ -437,8 +454,8 @@ docker exec tailscale tailscale ping 10.10.10.1
 
 ```bash
 # Exit Node Route freigegeben?
-docker exec headscale headscale routes list
-# 0.0.0.0/0 und ::/0 müssen "enabled" sein
+docker exec headscale headscale nodes list-routes
+# 0.0.0.0/0 und ::/0 müssen "approved" sein
 
 # DNS-Konfiguration prüfen
 tailscale status --json | jq '.Self.DNSServers'

@@ -84,7 +84,9 @@ docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@exa
 - `headscale-setup.sh` is idempotent (safe to run multiple times)
 - Both PostgreSQL instances share the same `POSTGRES_PASSWORD` env var
 - PostgreSQL volumes mount to `/var/lib/postgresql/data` (not `/var/lib/postgresql`)
+- Headscale v0.28 uses Policy v2: user references require `@` suffix (e.g. `homelab@`, not `homelab`). Use `autogroup:member` for untagged devices, `tag:name` for tagged devices
 - Headscale ACL SSH rules use `autogroup:member`/`autogroup:tagged` (wildcard `*` not supported in v0.28)
+- Headscale v0.28 route CLI: `headscale nodes list-routes` and `headscale nodes approve-routes --identifier <ID> --routes <CIDR>` (old `headscale routes list/enable` removed in v0.26)
 - Headscale DERP server needs explicit `private_key_path` in config
 - Headscale postgres `ssl: false` (not `disable` — Headplane validator rejects `disable`)
 - All Docker images pinned to specific versions. Renovate auto-updates with weekly schedule (patch automerge, minor/major as PR)
