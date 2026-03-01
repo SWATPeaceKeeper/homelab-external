@@ -55,11 +55,16 @@ Detaillierte Anleitung: [SETUP.md](SETUP.md)
 bootstrap.sh              Provisioning (lokal ausführen)
 teardown.sh               Teardown (lokal ausführen)
 cloud-init.yaml           Server-Grundkonfiguration
+renovate.json             Renovate Auto-Update Konfiguration
+docs/
+  README.md               Ausführliche Dokumentation
+  SETUP.md                Setup-Anleitung
 hetzner/
   docker-compose.yml      Alle Services
   .env.example            Environment-Template
   scripts/
     headscale-setup.sh    Headscale Bootstrap (auf Server)
+    auto-update.sh        Auto-Deploy Cron Script
   traefik/traefik.yml     Traefik Konfiguration
   headscale/              Headscale Config + ACL
   headplane/              Headplane Config

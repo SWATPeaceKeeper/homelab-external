@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Self-hosted homelab infrastructure on Hetzner Cloud (CX23, ~5 EUR/month). Provisioned via shell scripts (`bootstrap.sh` / `teardown.sh`) and Docker Compose. Documentation and comments are in German.
 
-**Services:** Headscale v0.28 (VPN), Headplane v0.6.2-beta.5 (VPN UI), Traefik v3.6 (reverse proxy + SSL), Uptime Kuma (monitoring), ntfy (push notifications), Healthchecks (cron monitoring), Tailscale client, two PostgreSQL 17-alpine databases.
+**Services:** Headscale v0.28 (VPN), Headplane v0.6.2 (VPN UI), Traefik v3.6 (reverse proxy + SSL), Uptime Kuma (monitoring), ntfy (push notifications), Healthchecks (cron monitoring), Tailscale client, two PostgreSQL 17-alpine databases.
 
 ## Architecture
 
@@ -87,10 +87,14 @@ docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@exa
 - Headscale ACL SSH rules use `autogroup:member`/`autogroup:tagged` (wildcard `*` not supported in v0.28)
 - Headscale DERP server needs explicit `private_key_path` in config
 - Headscale postgres `ssl: false` (not `disable` — Headplane validator rejects `disable`)
+- All Docker images pinned to specific versions. Renovate auto-updates with weekly schedule (patch automerge, minor/major as PR)
+- Cron-based auto-deploy (Tuesday 12:00 UTC) pulls merged updates from main
+- All containers run with no-new-privileges and cap_drop ALL
+- Traefik enforces TLS 1.2+, security headers (HSTS, CSP), and rate limiting
 
 ## Known Pitfalls
 
-- **Headplane version**: Must match Headscale version. v0.6.1 does NOT work with Headscale v0.28. Use v0.6.2-beta.5+.
+- **Headplane version**: Must match Headscale version. v0.6.1 does NOT work with Headscale v0.28. Use v0.6.2+.
 - **Headplane healthcheck**: Binary at `/bin/hp_healthcheck`. Unhealthy containers are invisible to Traefik (no routing).
 - **Headplane Docker socket**: Config requires `unix:///var/run/docker.sock` prefix (not just the path).
 - **Headplane Traefik routing**: Needs explicit `priority=200` so `/admin` paths go to Headplane, not the Headscale catch-all router.
@@ -103,14 +107,19 @@ docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@exa
 bootstrap.sh          # Provisioning script (local)
 teardown.sh           # Teardown script (local)
 cloud-init.yaml       # Server base setup (static, no templates)
-README.md             # Project overview
-SETUP.md              # Detailed setup guide
+README.md             # Project overview (short, links to docs/)
+renovate.json         # Renovate auto-update config
 CLAUDE.md             # This file
+docs/
+  README.md           # Detailed project documentation
+  SETUP.md            # Setup guide
+  plans/              # Design documents
 hetzner/
   .env.example        # Environment template
   docker-compose.yml  # All services
   scripts/
     headscale-setup.sh  # Headscale bootstrap (runs on server)
+    auto-update.sh      # Cron-based auto-deploy script
   headplane/
     config.yaml
   headscale/
