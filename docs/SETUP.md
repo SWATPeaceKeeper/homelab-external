@@ -106,15 +106,15 @@ von `bootstrap.sh` ausgegeben.
 
 ```bash
 # ntfy Admin-User erstellen
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec -it ntfy ntfy user add --role=admin admin'
 
 # Healthchecks Superuser erstellen
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@example.com'
 
 # Healthchecks Passwort setzen (oder via Web-UI "Forgot Password")
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec healthchecks ./manage.py shell -c "
 from django.contrib.auth.models import User
 u = User.objects.first()
@@ -123,10 +123,10 @@ u.save()
 "'
 
 # Hetzner-Server Node mit tag:server taggen (für ACL)
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec headscale headscale nodes list'
 # Node-ID des Hetzner-Servers (hostname: hetzner-server) notieren, dann:
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec headscale headscale nodes tag --identifier <ID> --tags tag:server'
 ```
 
@@ -193,10 +193,15 @@ services:
       - /dev/net/tun:/dev/net/tun
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
       - TS_EXTRA_ARGS=--login-server=https://headscale.homelab-external.robinwerner.net --advertise-tags=tag:gateway --advertise-routes=10.10.10.0/24 --advertise-exit-node --accept-dns=false
       - TS_AUTHKEY=${TS_AUTHKEY}
     network_mode: host
 ```
+
+> **Wichtig**: `TS_USERSPACE=false` ist erforderlich, damit Tailscale ein echtes
+> `tailscale0` TUN-Interface und Kernel-Routen erstellt. Ohne diese Einstellung
+> läuft Tailscale im Userspace-Modus und Subnet Routing funktioniert nicht.
 
 `.env`:
 
@@ -209,7 +214,7 @@ TS_AUTHKEY=
 
 ```bash
 # Auf dem Hetzner Server: Pre-Auth Key erstellen
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec headscale headscale preauthkeys create --user homelab --expiration 24h'
 
 # Key in .env eintragen
@@ -233,7 +238,7 @@ Prüfen ob die Routen aktiv sind:
 
 ```bash
 # Auf dem Hetzner Server
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP>
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP>
 
 # Alle Routen anzeigen
 docker exec headscale headscale nodes list-routes
@@ -275,7 +280,7 @@ dns:
 
   nameservers:
     global:
-      - 10.10.10.X  # <-- Pi-hole IP im Heimnetz
+      - 10.10.10.3  # Pi-hole IP im Heimnetz
 
   split: {}
   extra_records: []
@@ -284,7 +289,7 @@ dns:
 Danach Headscale neu starten:
 
 ```bash
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'cd /opt/homelab-repo/hetzner && docker compose restart headscale'
 ```
 
@@ -307,7 +312,7 @@ läuft mit `--accept-dns=false` und nutzt weiterhin seinen eigenen DNS.
 brew install tailscale
 
 # Pre-Auth Key erstellen (auf dem Hetzner Server)
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec headscale headscale preauthkeys create --user homelab --expiration 24h'
 
 # Mit Headscale verbinden
@@ -340,7 +345,7 @@ tailscale set --exit-node=
 5. Diesen Node auf dem Server registrieren:
 
 ```bash
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP> \
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP> \
   'docker exec headscale headscale nodes register --user homelab --key mkey:<KEY_VON_DER_SEITE>'
 ```
 
@@ -356,7 +361,7 @@ erkennt Headscale das Gerät automatisch, ohne manuelles Registrieren.
 ### SSH zum Server
 
 ```bash
-ssh -i ~/.ssh/id_ed25519 root@<SERVER_IP>
+ssh -i ~/.ssh/homelab-external root@<SERVER_IP>
 ```
 
 ### Docker Compose (auf dem Server)
@@ -467,7 +472,52 @@ tailscale status --json | jq '.Self.DNSServers'
 # Sollte die Pi-hole IP zeigen
 
 # Pi-hole direkt testen (vom NUC)
-dig @10.10.10.X google.com
+dig @10.10.10.3 google.com
+```
+
+### Tailscale Userspace-Networking (kein tailscale0 Interface)
+
+Tailscale läuft standardmäßig im Userspace-Modus — dabei wird kein `tailscale0`
+TUN-Interface erstellt und keine Kernel-Routen angelegt. Andere Container und
+der Host können dann keine VPN-Subnetze erreichen.
+
+```bash
+# Prüfen ob Userspace-Modus aktiv ist
+docker exec tailscale tailscale status
+# Falls in den Logs "--tun=userspace-networking" steht → Problem
+
+# Prüfen ob tailscale0 Interface existiert
+ip link show tailscale0
+# Falls "does not exist" → Userspace-Modus aktiv
+
+# Fix: TS_USERSPACE=false in der docker-compose.yml setzen
+# environment:
+#   - TS_USERSPACE=false
+
+# Danach Container neu erstellen
+docker compose down && docker compose up -d
+
+# Verifizieren: Kernel-Routen müssen sichtbar sein
+ip route show table 52
+# Sollte Routen wie "10.10.10.0/24 dev tailscale0" zeigen
+```
+
+### --accept-routes fehlt (Subnet Routes werden ignoriert)
+
+Tailscale Clients müssen `--accept-routes` setzen, um advertised Subnet
+Routes anderer Nodes zu nutzen. Ohne dieses Flag ignoriert der Client
+alle Subnet Routes — auch wenn sie in Headscale freigegeben sind.
+
+```bash
+# Health Warning prüfen
+docker exec tailscale tailscale status
+# Warnung: "Some peers are advertising routes but --accept-routes is false"
+
+# Fix: --accept-routes zu TS_EXTRA_ARGS hinzufügen
+# TS_EXTRA_ARGS=--login-server=... --accept-routes ...
+
+# Danach Container neu erstellen
+docker compose down && docker compose up -d
 ```
 
 ### Headscale Health Check schlägt fehl
