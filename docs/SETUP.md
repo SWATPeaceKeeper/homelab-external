@@ -125,6 +125,17 @@ docker compose logs -f <svc>   # Logs
 docker compose pull && docker compose up -d  # Update
 ```
 
+### Auto-Update
+
+Der Server prüft automatisch jeden Dienstag um 12:00 UTC ob neue Commits auf `main` vorliegen (z.B. von Renovate). Bei Änderungen wird `git pull && docker compose pull && docker compose up -d` ausgeführt.
+
+Log: `/var/log/homelab-update.log`
+
+Manuell auslösen:
+```bash
+bash /opt/homelab-repo/hetzner/scripts/auto-update.sh
+```
+
 ### Headscale
 
 ```bash

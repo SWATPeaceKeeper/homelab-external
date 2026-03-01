@@ -42,7 +42,6 @@
       "action": "accept",
       "src": ["group:server"],
       "dst": [
-        "homelab-network:22",
         "homelab-network:80",
         "homelab-network:443",
         "homelab-network:3000",

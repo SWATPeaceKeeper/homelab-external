@@ -24,11 +24,13 @@ services:
   # - HTTP → HTTPS Redirect
   # =========================================================================
   traefik:
-    image: traefik:v3.6
+    image: traefik:v3.6.9
     container_name: traefik
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
     ports:
       # HTTP (wird zu HTTPS weitergeleitet)
       - "80:80"
@@ -54,8 +56,19 @@ services:
       - "traefik.http.routers.dashboard.tls=true"
       - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.routers.dashboard.middlewares=auth,security-headers,rate-limit"
       - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+      # Security Headers (global middleware)
+      - "traefik.http.middlewares.security-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.security-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.security-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.security-headers.headers.permissionsPolicy=camera=(), microphone=(), geolocation=()"
+      # Rate Limiting
+      - "traefik.http.middlewares.rate-limit.ratelimit.average=50"
+      - "traefik.http.middlewares.rate-limit.ratelimit.burst=100"
 
   # =========================================================================
   # POSTGRESQL - Datenbank für Headscale
@@ -64,9 +77,13 @@ services:
   # Robuster als SQLite, besonders bei vielen Nodes.
   # =========================================================================
   headscale-postgres:
-    image: postgres:17-alpine
+    image: postgres:17.9-alpine
     container_name: headscale-postgres
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       - POSTGRES_USER=headscale
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -94,9 +111,13 @@ services:
   # docker exec headscale headscale users create homelab
   # =========================================================================
   headscale:
-    image: ghcr.io/juanfont/headscale:stable
+    image: ghcr.io/juanfont/headscale:v0.28.0
     container_name: headscale
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     command: serve
     depends_on:
       headscale-postgres:
@@ -106,15 +127,19 @@ services:
       # So bleibt das Passwort in .env und nicht in der Config-Datei
       - HEADSCALE_DATABASE_POSTGRES_PASS=${POSTGRES_PASSWORD}
     volumes:
-      - ./headscale/config.yaml:/etc/headscale/config.yaml
-      - ./headscale/acl.json:/etc/headscale/acl.json
-      - ./headscale/dns_records.json:/etc/headscale/dns_records.json
+      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
+      - ./headscale/acl.json:/etc/headscale/acl.json:ro
+      - ./headscale/dns_records.json:/etc/headscale/dns_records.json:ro
       - /opt/homelab-data/headscale:/var/lib/headscale
     networks:
       - proxy
       - internal
     healthcheck:
-        test: ["CMD", "headscale", "health"]
+      test: ["CMD", "headscale", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     labels:
       # Traefik labels to expose Headscale at headscale.example.com
       - "traefik.enable=true"
@@ -123,8 +148,8 @@ services:
       - "traefik.http.routers.headscale.tls.certresolver=letsencrypt"
       - "traefik.http.routers.headscale.entrypoints=websecure"
       # This middleware is essential to ensuring Headplane works correctly
-      - 'traefik.http.routers.headscale.middlewares=cors'
-      - 'traefik.http.middlewares.cors.headers.accesscontrolallowheaders=*'
+      - 'traefik.http.routers.headscale.middlewares=cors,security-headers'
+      - 'traefik.http.middlewares.cors.headers.accesscontrolallowheaders=Content-Type,Authorization'
       - 'traefik.http.middlewares.cors.headers.accesscontrolallowmethods=GET,POST,PUT'
       - 'traefik.http.middlewares.cors.headers.accesscontrolalloworiginlist=https://headscale.${SUBDOMAIN_PREFIX}.${DOMAIN}'
       - 'traefik.http.middlewares.cors.headers.accesscontrolmaxage=100'
@@ -151,15 +176,19 @@ services:
   # Dann in .env eintragen: HEADSCALE_API_KEY=...
   # =========================================================================
   headplane:
-    image: ghcr.io/tale/headplane:0.6.2-beta.5
+    image: ghcr.io/tale/headplane:v0.6.2
     container_name: headplane
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     volumes:
-      - ./headplane/config.yaml:/etc/headplane/config.yaml
+      - ./headplane/config.yaml:/etc/headplane/config.yaml:ro
       - /opt/homelab-data/headplane:/var/lib/headplane
-      - ./headscale/config.yaml:/etc/headscale/config.yaml
-      - ./headscale/dns_records.json:/etc/headscale/dns_records.json
-      - ./headscale/acl.json:/etc/headscale/acl.json
+      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
+      - ./headscale/dns_records.json:/etc/headscale/dns_records.json:ro
+      - ./headscale/acl.json:/etc/headscale/acl.json:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Cookie Secret aus Datei (nicht in Git)
       - /opt/homelab-data/secrets/cookie_secret:/run/secrets/cookie_secret:ro
@@ -181,6 +210,7 @@ services:
       - "traefik.http.routers.headplane.tls=true"
       - "traefik.http.routers.headplane.tls.certresolver=letsencrypt"
       - "traefik.http.routers.headplane.priority=200"
+      - "traefik.http.routers.headplane.middlewares=security-headers,rate-limit"
       - "traefik.http.services.headplane.loadbalancer.server.port=3000"
 
   # =========================================================================
@@ -197,10 +227,14 @@ services:
   # 3. Container neu starten
   # =========================================================================
   tailscale:
-    image: ghcr.io/tailscale/tailscale:stable
+    image: ghcr.io/tailscale/tailscale:v1.94.2
     container_name: tailscale
     hostname: hetzner-server
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -213,6 +247,12 @@ services:
       # Pre-Auth Key (nach Headscale-Setup eintragen)
       - TS_AUTHKEY=${TS_AUTHKEY:-}
     network_mode: host
+    healthcheck:
+      test: ["CMD", "tailscale", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # =========================================================================
   # UPTIME KUMA - Uptime Monitoring
@@ -221,11 +261,21 @@ services:
   # Kann Benachrichtigungen senden wenn etwas down ist.
   # =========================================================================
   uptime-kuma:
-    image: louislam/uptime-kuma:2
+    image: louislam/uptime-kuma:2.1.3
     container_name: uptime-kuma
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     volumes:
       - /opt/homelab-data/uptime-kuma:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/api/status-page/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - proxy
     labels:
@@ -234,6 +284,7 @@ services:
       - "traefik.http.routers.uptime.tls=true"
       - "traefik.http.routers.uptime.tls.certresolver=letsencrypt"
       - "traefik.http.services.uptime.loadbalancer.server.port=3001"
+      - "traefik.http.routers.uptime.middlewares=security-headers"
 
   # =========================================================================
   # NTFY - Push Notifications
@@ -246,9 +297,13 @@ services:
   # docker exec -it ntfy ntfy user add --role=admin admin
   # =========================================================================
   ntfy:
-    image: binwiederhier/ntfy:latest
+    image: binwiederhier/ntfy:v2.17.0
     container_name: ntfy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     command: serve
     environment:
       - TZ=${TZ:-Europe/Berlin}
@@ -277,6 +332,7 @@ services:
       - "traefik.http.routers.ntfy.tls=true"
       - "traefik.http.routers.ntfy.tls.certresolver=letsencrypt"
       - "traefik.http.services.ntfy.loadbalancer.server.port=80"
+      - "traefik.http.routers.ntfy.middlewares=security-headers"
 
   # =========================================================================
   # HEALTHCHECKS - Cronjob Monitoring
@@ -285,9 +341,13 @@ services:
   # Jeder Job pingt eine URL - wenn der Ping ausbleibt, wirst du benachrichtigt.
   # =========================================================================
   healthchecks:
-    image: healthchecks/healthchecks:latest
+    image: healthchecks/healthchecks:v4.0
     container_name: healthchecks
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       - ALLOWED_HOSTS=hc.${SUBDOMAIN_PREFIX}.${DOMAIN}
       - APPRISE_ENABLED=True
@@ -314,17 +374,28 @@ services:
     depends_on:
       healthchecks-postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v3/status/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.healthchecks.rule=Host(`hc.${SUBDOMAIN_PREFIX}.${DOMAIN}`)"
       - "traefik.http.routers.healthchecks.tls=true"
       - "traefik.http.routers.healthchecks.tls.certresolver=letsencrypt"
       - "traefik.http.services.healthchecks.loadbalancer.server.port=8000"
+      - "traefik.http.routers.healthchecks.middlewares=security-headers"
 
   healthchecks-postgres:
-    image: postgres:17-alpine
+    image: postgres:17.9-alpine
     container_name: healthchecks-postgres
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       - POSTGRES_USER=healthchecks
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

@@ -1,5 +1,8 @@
 # Environment-Datei (enthält Secrets!)
 hetzner/.env
+*.env
+.env.*
+!hetzner/.env.example
 
 # IDE
 .idea/

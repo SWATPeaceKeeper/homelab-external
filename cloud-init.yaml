@@ -25,6 +25,27 @@ packages:
   - apache2-utils
 
 # -----------------------------------------------------------------------------
+# SSH HARDENING
+# -----------------------------------------------------------------------------
+write_files:
+  - path: /etc/ssh/sshd_config.d/hardening.conf
+    content: |
+      PermitRootLogin prohibit-password
+      MaxAuthTries 3
+      LoginGraceTime 20
+      AllowAgentForwarding no
+      AllowTcpForwarding no
+      X11Forwarding no
+    owner: root:root
+    permissions: "0644"
+  - path: /etc/cron.d/homelab-update
+    content: |
+      # Auto-Update: Dienstag 12:00 UTC (nach Renovate am Montag)
+      0 12 * * 2 root /opt/homelab-repo/hetzner/scripts/auto-update.sh
+    owner: root:root
+    permissions: "0644"
+
+# -----------------------------------------------------------------------------
 # SETUP COMMANDS
 # -----------------------------------------------------------------------------
 runcmd:
@@ -59,6 +80,7 @@ runcmd:
   # =========================================================================
   - systemctl enable fail2ban
   - systemctl start fail2ban
+  - systemctl restart sshd
 
   # =========================================================================
   # ORDNERSTRUKTUR

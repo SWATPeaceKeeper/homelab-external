@@ -72,6 +72,7 @@ dns:
   nameservers:
     global:
       - 1.1.1.1
+      - 9.9.9.9
 
   split: {}
   extra_records: []
