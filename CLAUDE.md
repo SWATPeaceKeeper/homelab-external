@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Self-hosted homelab infrastructure on Hetzner Cloud (CX23, ~5 EUR/month). Provisioned via shell scripts (`bootstrap.sh` / `teardown.sh`) and Docker Compose. Documentation and comments are in German.
 
-**Services:** Headscale v0.28 (VPN), Headplane v0.6.2 (VPN UI), Traefik v3.6 (reverse proxy + SSL), Uptime Kuma (monitoring), ntfy (push notifications), Healthchecks (cron monitoring), Tailscale client, two PostgreSQL 17-alpine databases.
+**Services:** Headscale v0.28.0 (VPN), Headplane 0.6.2 (VPN UI), Traefik v3.6.9 (reverse proxy + SSL), Uptime Kuma 2.1.3 (monitoring), ntfy v2.17.0 (push notifications), Healthchecks v4.0 (cron monitoring), Tailscale v1.94.2 (VPN client), two PostgreSQL 17.9-alpine databases.
 
 ## Architecture
 
@@ -95,9 +95,17 @@ docker exec healthchecks ./manage.py createsuperuser --noinput --email admin@exa
 ## Known Pitfalls
 
 - **Headplane version**: Must match Headscale version. v0.6.1 does NOT work with Headscale v0.28. Use v0.6.2+.
+- **Headplane image tag**: NO `v` prefix on ghcr.io! Correct: `ghcr.io/tale/headplane:0.6.2` (not `v0.6.2`).
 - **Headplane healthcheck**: Binary at `/bin/hp_healthcheck`. Unhealthy containers are invisible to Traefik (no routing).
 - **Headplane Docker socket**: Config requires `unix:///var/run/docker.sock` prefix (not just the path).
 - **Headplane Traefik routing**: Needs explicit `priority=200` so `/admin` paths go to Headplane, not the Headscale catch-all router.
+- **Container capabilities**: `cap_drop: ALL` requires explicit `cap_add` for containers that manage files/permissions:
+  - PostgreSQL: `CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID` (data directory init)
+  - Headscale: `DAC_OVERRIDE, FOWNER, SETGID, SETUID` (runtime directory creation)
+  - Uptime Kuma: `CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID` (embedded MariaDB)
+  - Tailscale: `NET_ADMIN, SYS_MODULE` (VPN networking)
+- **Healthchecks image**: No `curl`/`wget` available. Healthcheck uses Python `urllib` with Host header from `ALLOWED_HOSTS` env var (Django rejects `localhost` requests).
+- **Uptime Kuma v2.x healthcheck**: Use `/api/entry-page` endpoint (not `/api/status-page/heartbeat` which returns 404).
 - **SSH known_hosts**: `bootstrap.sh` uses `UserKnownHostsFile=/dev/null` because server IPs get reused after teardown/rebuild.
 - **Cloud-init YAML**: Colons in shell commands break YAML parsing. Use list syntax: `['bash', '-c', 'echo "done: $(date)"']`.
 
