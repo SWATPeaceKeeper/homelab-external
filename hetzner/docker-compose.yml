@@ -84,6 +84,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     environment:
       - POSTGRES_USER=headscale
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -396,6 +402,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     environment:
       - POSTGRES_USER=healthchecks
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
