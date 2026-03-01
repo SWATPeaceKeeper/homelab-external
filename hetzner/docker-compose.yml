@@ -378,6 +378,7 @@ services:
     environment:
       - ALLOWED_HOSTS=hc.${SUBDOMAIN_PREFIX}.${DOMAIN}
       - APPRISE_ENABLED=True
+      - DEBUG=False
       - DB=postgres
       - DB_HOST=healthchecks-postgres
       - DB_NAME=healthchecks
