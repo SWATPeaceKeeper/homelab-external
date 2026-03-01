@@ -12,7 +12,6 @@ Selbst-gehostete Infrastruktur auf Hetzner Cloud (~5 EUR/Monat).
 | ntfy | `ntfy.homelab-external.robinwerner.net` | Push Notifications |
 | Healthchecks | `hc.homelab-external.robinwerner.net` | Cronjob Monitoring |
 | Traefik | `traefik.homelab-external.robinwerner.net` | Reverse Proxy Dashboard |
-| Dockge | `dockge.homelab-external.robinwerner.net` | Docker Compose Manager |
 
 ---
 
@@ -68,7 +67,7 @@ Das Script macht automatisch:
 - SSH Key zu Hetzner hochladen
 - Firewall erstellen (SSH, HTTP, HTTPS, DERP)
 - Server mit Cloud-Init erstellen (Docker, UFW, fail2ban)
-- 7 DNS A-Records bei Cloudflare anlegen
+- 5 DNS A-Records bei Cloudflare anlegen
 - Auf SSH + Cloud-Init warten
 - Repo klonen (HTTPS, public)
 - `.env` generieren (Passwörter, Traefik Auth)

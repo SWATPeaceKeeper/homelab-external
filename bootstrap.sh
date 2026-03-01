@@ -36,7 +36,7 @@ SSH_KEY_NAME="${SERVER_NAME}-key"
 FIREWALL_NAME="${SERVER_NAME}-firewall"
 
 # DNS Subdomains die angelegt werden
-SUBDOMAINS=("headscale" "uptime" "ntfy" "hc" "traefik" "dockge")
+SUBDOMAINS=("headscale" "uptime" "ntfy" "hc" "traefik")
 
 # ---------------------------------------------------------------------------
 # HILFSFUNKTIONEN
@@ -296,7 +296,7 @@ for sub in "${SUBDOMAINS[@]}"; do
   printf "    %-12s https://%s.%s.%s\n" "${sub}:" "${sub}" "${SUBDOMAIN_PREFIX}" "${DOMAIN}"
 done
 echo ""
-echo "  Traefik + Dockge (Basic Auth):"
+echo "  Traefik Dashboard (Basic Auth):"
 echo "    User:     admin"
 echo "    Passwort: ${TRAEFIK_PASSWORD}"
 echo ""

@@ -12,7 +12,6 @@ Selbst-gehostete Infrastruktur auf einem Hetzner vServer (~5 EUR/Monat). VPN, Mo
 | [Uptime Kuma](https://github.com/louislam/uptime-kuma) | Uptime Monitoring & Status Page |
 | [ntfy](https://ntfy.sh/) | Push-Notification Server |
 | [Healthchecks](https://healthchecks.io/) | Cronjob Monitoring |
-| [Dockge](https://github.com/louislam/dockge) | Docker Compose Manager (Web-UI) |
 
 ## Architektur
 
@@ -21,7 +20,7 @@ Selbst-gehostete Infrastruktur auf einem Hetzner vServer (~5 EUR/Monat). VPN, Mo
                         │           Hetzner vServer (CX23)        │
                         │                                         │
 Internet ──► Traefik ──►│  headscale    uptime-kuma    ntfy       │
-             (443/80)   │  headplane    healthchecks   dockge     │
+             (443/80)   │  headplane    healthchecks              │
                         │                                         │
                         │  ┌─────────────┐  ┌──────────────────┐  │
                         │  │ PostgreSQL   │  │ PostgreSQL       │  │

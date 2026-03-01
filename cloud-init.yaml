@@ -75,8 +75,6 @@ runcmd:
   - mkdir -p /opt/homelab-data/healthchecks
   - mkdir -p /opt/homelab-data/healthchecks-postgres
   - mkdir -p /opt/homelab-data/tailscale
-  - mkdir -p /opt/homelab-data/dockge
-  - mkdir -p /opt/stacks
   - mkdir -p /var/log/traefik
 
   # acme.json für Let's Encrypt (MUSS 600 sein!)

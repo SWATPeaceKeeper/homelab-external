@@ -27,7 +27,7 @@ SUBDOMAIN_PREFIX="homelab-external"
 SSH_KEY_NAME="${SERVER_NAME}-key"
 FIREWALL_NAME="${SERVER_NAME}-firewall"
 
-SUBDOMAINS=("headscale" "uptime" "ntfy" "hc" "traefik" "dockge")
+SUBDOMAINS=("headscale" "uptime" "ntfy" "hc" "traefik")
 
 # ---------------------------------------------------------------------------
 # HILFSFUNKTIONEN
