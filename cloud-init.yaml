@@ -38,6 +38,12 @@ write_files:
       X11Forwarding no
     owner: root:root
     permissions: "0644"
+  - path: /etc/cron.d/homelab-update
+    content: |
+      # Auto-Update: Dienstag 12:00 UTC (nach Renovate am Montag)
+      0 12 * * 2 root /opt/homelab-repo/hetzner/scripts/auto-update.sh
+    owner: root:root
+    permissions: "0644"
 
 # -----------------------------------------------------------------------------
 # SETUP COMMANDS
