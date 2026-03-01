@@ -193,7 +193,7 @@ services:
       - /dev/net/tun:/dev/net/tun
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
-      - TS_EXTRA_ARGS=--login-server=https://headscale.homelab-external.robinwerner.net --advertise-routes=10.10.10.0/24 --advertise-exit-node --accept-dns=false
+      - TS_EXTRA_ARGS=--login-server=https://headscale.homelab-external.robinwerner.net --advertise-tags=tag:gateway --advertise-routes=10.10.10.0/24 --advertise-exit-node --accept-dns=false
       - TS_AUTHKEY=${TS_AUTHKEY}
     network_mode: host
 ```
@@ -223,11 +223,11 @@ docker compose up -d
 docker exec tailscale tailscale status
 ```
 
-### 4. Routen und Exit Node prüfen
+### 4. Routen und Exit Node freigeben
 
-Die ACL enthält `autoApprovers` — Subnet Routes und Exit Nodes werden
-automatisch freigegeben, sobald ein Node sie ankündigt. Manuelle
-Freigabe ist nicht nötig.
+Die ACL enthält `autoApprovers` mit `tag:gateway` — Subnet Routes und
+Exit Nodes werden automatisch freigegeben, weil der NUC diesen Tag
+per `--advertise-tags` ankündigt.
 
 Prüfen ob die Routen aktiv sind:
 
@@ -244,7 +244,8 @@ docker exec headscale headscale nodes list-routes
 # - ::/0            (Exit Node IPv6)
 ```
 
-Falls Routen nicht automatisch freigegeben werden, manuell genehmigen:
+Falls autoApproval nicht greift ([bekannter Bug](https://github.com/juanfont/headscale/issues/2547)),
+manuell freigeben:
 
 ```bash
 # Node-ID des NUC ermitteln
@@ -255,6 +256,10 @@ docker exec headscale headscale nodes approve-routes \
   --identifier <NUC_NODE_ID> \
   --routes 10.10.10.0/24,0.0.0.0/0,::/0
 ```
+
+> **Hinweis**: Falls autoApproval beim ersten Mal nicht greift, einmal
+> den NUC-Container neu starten (`docker compose restart`). Alternativ
+> die manuelle Freigabe nutzen — das ist nur einmal nötig.
 
 ### 5. DNS auf Pi-hole umstellen
 

@@ -10,9 +10,10 @@
 
 {
   // TAG OWNERS
-  // Nur User "homelab" darf tag:server vergeben
+  // User "homelab" darf diese Tags vergeben
   "tagOwners": {
-    "tag:server": ["homelab@"]
+    "tag:server": ["homelab@"],
+    "tag:gateway": ["homelab@"]
   },
 
   // HOSTS (Aliase)
@@ -21,12 +22,12 @@
   },
 
   // AUTO-APPROVAL
-  // Routen und Exit Nodes werden automatisch freigegeben
+  // Routen und Exit Nodes mit tag:gateway werden automatisch freigegeben
   "autoApprovers": {
     "routes": {
-      "10.10.10.0/24": ["homelab@"]
+      "10.10.10.0/24": ["tag:gateway"]
     },
-    "exitNode": ["homelab@"]
+    "exitNode": ["tag:gateway"]
   },
 
   // ACL REGELN
