@@ -288,7 +288,7 @@ services:
     volumes:
       - /opt/homelab-data/uptime-kuma:/app/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3001/api/status-page/heartbeat || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/api/entry-page || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -392,7 +392,7 @@ services:
       healthchecks-postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v3/status/ || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request,os; urllib.request.urlopen(urllib.request.Request('http://localhost:8000/api/v3/status/', headers={'Host': os.environ['ALLOWED_HOSTS']}))\""]
       interval: 30s
       timeout: 5s
       retries: 5
