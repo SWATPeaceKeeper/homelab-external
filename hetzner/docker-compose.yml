@@ -386,6 +386,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DEFAULT_FROM_EMAIL=healthchecks@smtp.robinwerner.net
       - EMAIL_HOST=mail-eu.smtp2go.com
+      - EMAIL_PORT=2525
       - EMAIL_HOST_PASSWORD=${HEALTHCHECKS_SMTP_PASSWORD}
       - EMAIL_HOST_USER=healthchecks@smtp.robinwerner.net
       - PING_BODY_LIMIT=100000
