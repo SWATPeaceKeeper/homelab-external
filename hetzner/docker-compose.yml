@@ -385,9 +385,9 @@ services:
       - DB_USER=healthchecks
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN}
-      - EMAIL_HOST=smtp.eu.mailgun.org
+      - EMAIL_HOST=mail-eu.smtp2go.com
       - EMAIL_HOST_PASSWORD=${HEALTHCHECKS_SMTP_PASSWORD}
-      - EMAIL_HOST_USER=healthchecks@mailgun.robinwerner.net
+      - EMAIL_HOST_USER=healthchecks@smtp.robinwerner.net
       - PING_BODY_LIMIT=100000
       - PING_EMAIL_DOMAIN=hc.${SUBDOMAIN_PREFIX}.${DOMAIN}
       - REGISTRATION_OPEN=False
